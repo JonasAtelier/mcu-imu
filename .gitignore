@@ -1,0 +1,21 @@
+# ESP-IDF builds of examples/esp/
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+docs/*.pdf
+test/test_mpu6050_math
+test/test_icm45686_math
+test/esp/test_core
+test/esp/test_mpu6050
+test/esp/test_icm45686
+test/esp/test_bmi088_core
+test/esp/test_bmi088
+test/stm/test_core
+test/stm/test_mpu6050
+test/stm/test_icm45686
+test/stm/test_bmi088_core
+test/stm/test_bmi088
+test/esp/test_port_esp
+test/stm/test_port_stm

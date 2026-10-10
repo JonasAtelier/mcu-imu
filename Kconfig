@@ -1,0 +1,42 @@
+# Read by ESP-IDF as a component Kconfig, and by both forges' `make menu`
+# (scripts/menu.py) for the IMU_<CHIP> prompts. stm-forge has no Kconfig
+# build step: its build only sees the defconfig lines, as
+# -DCONFIG_IMU_<CHIP>=1 or 0. Every chip is off unless set.
+menuconfig IMU
+    bool "IMU subsystem"
+    default y
+    help
+        The imu core: struct imu_dev, imu_read() and the imu_* log
+        helpers. Pick the chip drivers you need below; none is built by
+        default, so a chip missing from sdkconfig is off.
+
+if IMU
+
+    config IMU_MPU6050
+        bool "InvenSense MPU-6050 (I2C)"
+        default n
+        help
+            Build the MPU-6050 driver: mpu6050_probe() and friends.
+
+    config IMU_ICM45686
+        bool "TDK InvenSense ICM-45686 (SPI)"
+        default n
+        help
+            Build the ICM-45686 driver: icm45686_probe() and friends.
+
+    config IMU_BMI088
+        bool "Bosch BMI088 (I2C or SPI)"
+        default n
+        help
+            Build the BMI088 driver: bmi088_probe_i2c(), bmi088_probe_spi()
+            and friends. On the STM32 HAL it needs both the I2C and the SPI
+            module.
+
+    config IMU_DEBUG
+        bool "imu_dbg() lines"
+        default n
+        help
+            STM32 HAL only: compile imu_dbg() lines in. On ESP-IDF imu_dbg()
+            is ESP_LOGD and the log level decides.
+
+endif # IMU
