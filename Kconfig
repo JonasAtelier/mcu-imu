@@ -32,6 +32,14 @@ if IMU
             and friends. On the STM32 HAL it needs both the I2C and the SPI
             module.
 
+    config IMU_WT901
+        bool "WitMotion WT901C-TTL (serial)"
+        default n
+        help
+            Build the WT901 driver: wt901_probe() and friends, reading the
+            module's frame stream on a UART the app has set up. On the
+            STM32 HAL it needs the UART module.
+
     config IMU_DEBUG
         bool "imu_dbg() lines"
         default n

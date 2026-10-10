@@ -19,3 +19,6 @@ test/stm/test_bmi088_core
 test/stm/test_bmi088
 test/esp/test_port_esp
 test/stm/test_port_stm
+test/test_wt901_math
+test/esp/test_wt901
+test/stm/test_wt901

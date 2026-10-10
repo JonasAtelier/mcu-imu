@@ -7,8 +7,9 @@
 </p>
 
 A small Linux-IIO-style IMU subsystem for ESP-IDF and the STM32 HAL (F4 and
-F7), plus three chip drivers: the InvenSense MPU-6050 (I2C), the TDK InvenSense
-ICM-45686 (SPI) and the Bosch BMI088 (I2C or SPI). Every chip's probe fills
+F7), plus four chip drivers: the InvenSense MPU-6050 (I2C), the TDK InvenSense
+ICM-45686 (SPI), the Bosch BMI088 (I2C or SPI) and the WitMotion WT901C-TTL
+module (serial). Every chip's probe fills
 one `struct imu_dev`, and from then on `imu_read()` gives you the same
 `struct imu_sample` whatever the chip is: acceleration in m/s², angular rate
 in rad/s, die temperature in °C, a timestamp from `imu_time_us()`, and your
@@ -34,13 +35,16 @@ The BMI088 holds two, one per die: a die is just an I2C address or a chip
 select, which is what a bus instance is. Its accelerometer's SPI dummy byte
 stays in the chip driver.
 
-The UART kind is there for command/response parts, though no imu chip uses
-it yet: `imu_uart_attach()` takes a `uart_port_t` whose driver the app has
-installed on ESP-IDF, or a `UART_HandleTypeDef *` it has initialised on the
-HAL. Each transfer drops stale input, sends the command byte and its
-arguments, then waits for the whole answer; one that stops short is
-`-ETIMEDOUT`. On the HAL the UART code sits under `HAL_UART_MODULE_ENABLED`,
-so an app without the UART module builds as before.
+`imu_uart_attach()` takes a `uart_port_t` whose driver the app has installed
+on ESP-IDF, or a `UART_HandleTypeDef *` it has initialised on the HAL. Each
+transfer drops stale input, sends the command byte and its arguments, then
+waits for the whole answer; one that stops short is `-ETIMEDOUT`. A part that
+streams on its own instead of answering, like the WT901, has one more op,
+`receive(rx, n, drop_stale)`: wait for n bytes with nothing sent, dropping
+whatever was already waiting first if asked. It is UART-only; I2C and SPI
+leave it NULL and `imu_bus_receive()` says `-EOPNOTSUPP`. On the HAL the UART
+code sits under `HAL_UART_MODULE_ENABLED`, so an app without the UART module
+builds as before.
 
 > **Hardware unverified.** The host tests in `test/` pass. Nothing here has
 > run on a physical chip.
@@ -62,6 +66,7 @@ PKG_imu             = y
 IMU_MPU6050         = y
 # IMU_ICM45686 is not set
 # IMU_BMI088 is not set
+# IMU_WT901 is not set
 ```
 
 or with `make menu`. esp-forge turns each line into `CONFIG_IMU_<CHIP>=y` in
@@ -108,6 +113,7 @@ define the module each chip uses, and its `.c` must be in the build:
 | `IMU_MPU6050` | `HAL_I2C_MODULE_ENABLED` | `stm32f{4,7}xx_hal_i2c.c` |
 | `IMU_ICM45686` | `HAL_SPI_MODULE_ENABLED` | `stm32f{4,7}xx_hal_spi.c` |
 | `IMU_BMI088` | both | both |
+| `IMU_WT901` | `HAL_UART_MODULE_ENABLED` | `stm32f{4,7}xx_hal_uart.c` |
 
 stm-forge's `mcu/stm32f4.cmake` and `mcu/stm32f7.cmake` already list both
 sources, plus `_hal_i2c_ex.c` (for the `HAL_I2CEx_ConfigAnalogFilter()` that
@@ -616,6 +622,58 @@ the example only turns on the STM32's weak internal ones.
 PS to GND, and **pull-ups on both chip selects** so neither die is selected
 while the STM32 boots. Mode 0 and mode 3, up to 10 MHz.
 
+### WT901C-TTL
+
+WitMotion's "WT901 Attitude Angle Sensor SPECIFICATION", in `docs/WT901.pdf`
+(not committed). It is for the WT901 core; no C-TTL-specific manual was
+found, and the cased C-TTL is assumed to speak the same serial protocol.
+Every byte, register and scale in `src/wt901_proto.h` and `src/wt901.c`
+cites its section and page. Serial only: the core's IIC mode (chapter 7) is
+not supported.
+
+**Wiring and link.** The app sets the UART up: 9600 bps out of the box, no
+parity (chapter 6, p.30), TTL levels — never RS232. `wt901_probe()` takes a
+`uart_port_t` with its driver installed on ESP-IDF, or a
+`UART_HandleTypeDef *` on the HAL.
+
+**It streams; the driver reads the stream.** The module sends 11-byte
+frames on its own — 0x55, a type, eight data bytes, a SUM (§6.1) — at 10 Hz
+by default (§6.2). The PDF has no serial command to read a register, and
+switching the output off takes a save and a power cycle (§6.2.9), so the
+probe writes nothing to the module. The driver looks at the stream through
+an 11-byte window and takes a frame only when the header, a known type
+(0x50-0x5A) and the SUM all check out; otherwise it slides to the next 0x55
+in the window, so a read that starts mid-frame, line noise, or a 0x55 inside
+the data cannot throw it off. Each read looks at most 256 bytes.
+
+**`imu_read()`** drops what was already waiting, then takes the next
+accelerometer (0x51) and gyroscope (0x52) frames in either order: up to one
+output period, 100 ms at the default rate. The two are consecutive frames,
+not one instant. Scales are §6.1.2-6.1.3: ×16/32768 g, using this library's
+`IMU_G` (the PDF writes g as 9.8 m/s²), and ×2000/32768 °/s; temperature is
+the accelerometer frame's, /100 °C.
+
+**Errors.** Silence at probe is `-ENXIO`, a stream that stops later
+`-ETIMEDOUT`. Bytes whose frames never pass the SUM — usually the wrong baud
+rate — are **`-EBADMSG`**. Valid frames without 0x51 and 0x52 — their output
+switched off in the module's return content (§6.2.8) — are `-ENODATA`.
+
+**Extras.** `wt901_read_angles()` is the module's own roll, pitch and yaw
+(the 0x53 frame, §6.1.4). `wt901_command(address, value)` sends 0xFF 0xAA
+address dataL dataH (§6.2) for everything else — content, rate, calibration,
+biases; several only take effect after a save and a power cycle.
+`wt901_config.timeout_ms` (0 is 200 ms) must cover an output period if you
+slow the module down.
+
+**Gaps in the PDF**, filled with a stated assumption:
+
+- The SUM. §6.1.2, 6.1.3, 6.1.4 and 6.1.10 give 0x55 + the type + the eight
+  data bytes; the other frames' formulas name the wrong type and are taken
+  as typos. The PDF never says the sum is cut to a byte; SUM is one byte, so
+  the low 8 bits are compared.
+- §6.1.4 is titled "Angular Velocity Output" but is the angle frame.
+- The PDF gives no order for the frames in a cycle, so none is assumed.
+
 ## Adding a chip
 
 A driver is a probe, a remove and one read function:
@@ -681,13 +739,15 @@ chip through ESP-IDF's calls instead (`i2c_master_*`, `spi_device_*`,
 
 | Binary | Checks |
 |---|---|
-| `test_port_esp`, `test_port_stm` | the UART ops of each port, which no chip reaches yet: an ESP-IDF port without an installed driver refused; stale input dropped before the send (on the HAL: overrun cleared, data register read empty); command and arguments in one send; no read for a command without an answer, none after a failed send; a short answer as `-ETIMEDOUT`; the read wait in ticks rounded up; driver and HAL failures mapped to errno; too much to send refused before the line is touched |
+| `test_port_esp`, `test_port_stm` | the UART ops of each port, framing case by case: an ESP-IDF port without an installed driver refused; stale input dropped before the send (on the HAL: overrun cleared, data register read empty); command and arguments in one send; no read for a command without an answer, none after a failed send; a short answer as `-ETIMEDOUT`; the read wait in ticks rounded up; driver and HAL failures mapped to errno; too much to send refused before the line is touched; `receive()` sends nothing, drops stale input only when asked, a short count is `-ETIMEDOUT`, and I2C has none (`-EOPNOTSUPP`) |
 | `test_core` | mount matrix is `M·v`, not the transpose; all-zero is identity; errno passes through and the sample is untouched on error; the default clock is `HAL_GetTick()` in µs; log prefix and `imu_log_sample()` format, including 64-bit timestamps without `%lld` |
 | `test_mpu6050_math` | scale tables, the 36.53 °C offset, and the rate/filter interaction — the same divider means different rates under different filters, and unreachable rates are refused |
 | `test_mpu6050` | a fake MPU-6050 behind a fake HAL: probe, reset-then-wake-onto-PLL, the burst layout with distinct values per axis so a wrong offset cannot pass by luck, the 7-bit address shifted for the HAL, `-ENXIO`/`-EAGAIN`/`-ETIMEDOUT`/`-EIO` mapping, no allocation on a refused probe, teardown leaves it asleep, waits ask for at least what the chip needs, another chip's `imu_dev` is refused |
 | `test_icm45686_math` | scale tables run backwards and each step halves; the ODR table |
 | `test_icm45686` | a fake ICM-45686 modelling the SPI read bit, the software chip select, soft reset, the indirect register path and the 14-byte burst — accel and gyro must come from **one** transaction; a handle not in mode 3 or not 8-bit is refused |
 | `test_bmi088_core` | the chip half against a mock bus: write sequence and delays, scaling, temperature decode and `-ERANGE`, outputs untouched on error, `imu_read()` in SI, an app's `imu_time_us()` replacing the weak default |
+| `test_wt901_math` | one accelerometer frame worked by hand, SUM included; any changed byte, or an unknown type even with its SUM made to match, rejected; low-byte-first signed values; the §6.1.2-6.1.4 full scales |
+| `test_wt901` | one fake module in `test/wt901_cases.h`, run through both ports by a little glue each: probe writes nothing; silence `-ENXIO`, bad SUMs only `-EBADMSG`, no gyroscope frames `-ENODATA`, a stream that stops `-ETIMEDOUT`, none of them allocating; scales and temperature; stale input dropped; frames in any order with other types between; a read starting mid-frame; noise full of 0x55s; a bad-SUM frame skipped; angles; command bytes; `-EBUSY` and foreign devices refused |
 | `test_bmi088` | the HAL transport against fake dies: the accelerometer's SPI dummy byte, its switch to SPI on a chip-select rising edge (at power-on and again after soft reset), errno mapping, a failed probe leaks nothing, no 0 ms delays, bad bus configs refused |
 
 All build under `-std=gnu11 -Wall -Wextra -Werror -pedantic`, with
