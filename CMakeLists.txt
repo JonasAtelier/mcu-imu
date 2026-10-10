@@ -1,6 +1,8 @@
-# ESP-IDF only. stm-forge never reads this file: it compiles every src/*.c of
-# the library and adds include/, which is why the sources sit flat in src/ and
-# each port file is empty on the other platform.
+# ESP-IDF only. stm-forge never reads this file: it compiles every .c under
+# src/, chip folders included, puts src/ on the include path of this library's
+# sources and adds include/ -- which is why each port file is empty on the
+# other platform. Here the chip files are listed one by one, and
+# PRIV_INCLUDE_DIRS "src" lets a chip folder reach imu_priv.h by plain name.
 #
 # The core is always built, even with CONFIG_IMU off; each chip driver only
 # when its Kconfig option is on. Kconfig values are available here during the
@@ -18,16 +20,16 @@ if(CONFIG_IMU AND NOT (CONFIG_IMU_MPU6050 OR CONFIG_IMU_ICM45686 OR
 endif()
 
 if(CONFIG_IMU_MPU6050)
-    list(APPEND srcs "src/mpu6050.c")
+    list(APPEND srcs "src/mpu6050/mpu6050.c")
 endif()
 if(CONFIG_IMU_ICM45686)
-    list(APPEND srcs "src/icm45686.c")
+    list(APPEND srcs "src/icm45686/icm45686.c")
 endif()
 if(CONFIG_IMU_BMI088)
-    list(APPEND srcs "src/bmi088.c" "src/bmi088_bus.c")
+    list(APPEND srcs "src/bmi088/bmi088.c" "src/bmi088/bmi088_bus.c")
 endif()
 if(CONFIG_IMU_WT901)
-    list(APPEND srcs "src/wt901.c")
+    list(APPEND srcs "src/wt901/wt901.c")
 endif()
 
 idf_component_register(SRCS ${srcs}

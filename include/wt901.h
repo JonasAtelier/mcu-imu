@@ -10,9 +10,9 @@
  * The document in docs/WT901.pdf is WitMotion's "WT901 Attitude Angle Sensor
  * SPECIFICATION", for the WT901 core. No C-TTL-specific manual was found;
  * the cased C-TTL is assumed to speak the same serial protocol. Every byte,
- * register and scale in src/wt901_proto.h and wt901.c cites its section and
- * page. The core also has an IIC mode (chapter 7); this driver does not
- * support it. Nothing here has been run against a physical module.
+ * register and scale in src/wt901/wt901_proto.h and wt901.c cites its
+ * section and page. The core also has an IIC mode (chapter 7); this driver
+ * does not support it. Nothing here has been run against a physical module.
  *
  * Samples come out of imu_read(). Everything below that is WT901 specific
  * takes the struct imu_dev that wt901_probe() filled, and returns -EINVAL if

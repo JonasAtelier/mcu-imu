@@ -1,7 +1,9 @@
 CC ?= cc
 # gnu11, not c11: the imu_* log macros use `, ##__VA_ARGS__`.
 CFLAGS += -std=gnu11 -Wall -Wextra -Werror -pedantic
-CPPFLAGS += -I../include -I../src
+# src/ for the common private header, and every chip folder, because the
+# tests include a chip's private headers by plain name.
+CPPFLAGS += -I../include -I../src $(addprefix -I,$(wildcard ../src/*/))
 
 # Two full suites, one per platform: the same chip drivers through
 # src/imu_port_esp.c against idf_stubs/ (esp/), and through src/imu_port_stm.c
@@ -44,21 +46,29 @@ test_icm45686_math: test_icm45686_math.c
 test_wt901_math: test_wt901_math.c
 
 esp/test_core: esp/test_core.c $(ESP_CORE)
-esp/test_mpu6050: esp/test_mpu6050.c ../src/mpu6050.c $(ESP_CORE)
-esp/test_icm45686: esp/test_icm45686.c ../src/icm45686.c $(ESP_CORE)
-esp/test_bmi088_core: esp/test_bmi088_core.c ../src/bmi088.c $(ESP_CORE)
-esp/test_bmi088: esp/test_bmi088.c ../src/bmi088.c ../src/bmi088_bus.c \
+esp/test_mpu6050: esp/test_mpu6050.c ../src/mpu6050/mpu6050.c \
+		  $(ESP_CORE)
+esp/test_icm45686: esp/test_icm45686.c ../src/icm45686/icm45686.c \
+		   $(ESP_CORE)
+esp/test_bmi088_core: esp/test_bmi088_core.c ../src/bmi088/bmi088.c \
+		      $(ESP_CORE)
+esp/test_bmi088: esp/test_bmi088.c ../src/bmi088/bmi088.c \
+		 ../src/bmi088/bmi088_bus.c \
 		 $(ESP_CORE)
-esp/test_wt901: esp/test_wt901.c ../src/wt901.c $(ESP_CORE)
+esp/test_wt901: esp/test_wt901.c ../src/wt901/wt901.c $(ESP_CORE)
 esp/test_port_esp: esp/test_port_esp.c $(ESP_CORE)
 
 stm/test_core: stm/test_core.c $(STM_CORE)
-stm/test_mpu6050: stm/test_mpu6050.c ../src/mpu6050.c $(STM_CORE)
-stm/test_icm45686: stm/test_icm45686.c ../src/icm45686.c $(STM_CORE)
-stm/test_bmi088_core: stm/test_bmi088_core.c ../src/bmi088.c $(STM_CORE)
-stm/test_bmi088: stm/test_bmi088.c ../src/bmi088.c ../src/bmi088_bus.c \
+stm/test_mpu6050: stm/test_mpu6050.c ../src/mpu6050/mpu6050.c \
+		  $(STM_CORE)
+stm/test_icm45686: stm/test_icm45686.c ../src/icm45686/icm45686.c \
+		   $(STM_CORE)
+stm/test_bmi088_core: stm/test_bmi088_core.c ../src/bmi088/bmi088.c \
+		      $(STM_CORE)
+stm/test_bmi088: stm/test_bmi088.c ../src/bmi088/bmi088.c \
+		 ../src/bmi088/bmi088_bus.c \
 		 $(STM_CORE)
-stm/test_wt901: stm/test_wt901.c ../src/wt901.c $(STM_CORE)
+stm/test_wt901: stm/test_wt901.c ../src/wt901/wt901.c $(STM_CORE)
 stm/test_port_stm: stm/test_port_stm.c $(STM_CORE)
 
 $(ESP_TESTS): CPPFLAGS += $(ESP_CPPFLAGS)
@@ -89,6 +99,6 @@ clean:
 # Headers are prerequisites so that editing one rebuilds. Without this, `make
 # test` reruns a stale binary and reports green for code it never compiled.
 # Recipes use $(filter %.c,$^) so the headers never reach the compiler.
-HDRS  := $(wildcard ../include/*.h ../src/*.h)
+HDRS  := $(wildcard ../include/*.h ../src/*.h ../src/*/*.h)
 STUBS := $(wildcard idf_stubs/*.h idf_stubs/*/*.h hal_stubs/*.h) wt901_cases.h
 $(TESTS): $(HDRS) $(STUBS)

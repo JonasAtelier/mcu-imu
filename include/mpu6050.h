@@ -15,8 +15,8 @@
  * takes the struct imu_dev that mpu6050_probe() filled, and returns -EINVAL
  * if handed a device some other driver probed.
  *
- * Register provenance is documented in src/mpu6050_regs.h. Nothing in this
- * driver has been run against a physical chip.
+ * Register provenance is documented in src/mpu6050/mpu6050_regs.h. Nothing
+ * in this driver has been run against a physical chip.
  */
 #ifndef MPU6050_H
 #define MPU6050_H

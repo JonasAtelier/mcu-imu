@@ -13,8 +13,8 @@
  * takes the struct imu_dev that icm45686_probe() filled, and returns -EINVAL
  * if handed a device some other driver probed.
  *
- * Register provenance is documented in src/icm45686_regs.h. Nothing in this
- * driver has been run against a physical chip.
+ * Register provenance is documented in src/icm45686/icm45686_regs.h.
+ * Nothing in this driver has been run against a physical chip.
  */
 #ifndef ICM45686_H
 #define ICM45686_H

@@ -302,7 +302,7 @@ while the STM32 boots. Mode 0 and mode 3, up to 10 MHz.
 WitMotion's "WT901 Attitude Angle Sensor SPECIFICATION", in `docs/WT901.pdf`
 (not committed). It is for the WT901 core; no C-TTL-specific manual was
 found, and the cased C-TTL is assumed to speak the same serial protocol.
-Every byte, register and scale in `src/wt901_proto.h` and `src/wt901.c`
+Every byte, register and scale in `src/wt901/wt901_proto.h` and `src/wt901/wt901.c`
 cites its section and page. Serial only: the core's IIC mode (chapter 7) is
 not supported.
 

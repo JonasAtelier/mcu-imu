@@ -45,8 +45,14 @@ A driver is a probe, a remove and one read function:
 1. `include/foo.h`: `int foo_probe(struct imu_dev *imu, <bus>, const struct foo_config *cfg);`
    and `void foo_remove(struct imu_dev *imu);`, with the platform's handle
    types behind `#ifdef ESP_PLATFORM`, as `mpu6050.h` and `icm45686.h` do.
-2. `src/foo.c`, flat in `src/` — stm-forge does not glob subdirectories —
-   with private headers beside it. Wrap the whole driver in
+2. `src/foo/foo.c`, in a folder of its own with its private headers
+   (`foo_regs.h`, `foo_priv.h`, ...); common files and the platform ports
+   stay at the top of `src/`. Include siblings and `imu_priv.h` by plain
+   name, never with `../`: siblings resolve from the chip's own folder, and
+   `imu_priv.h` through `src/`, which the ESP-IDF CMakeLists has as
+   `PRIV_INCLUDE_DIRS` and stm-forge's `libs.cmake` puts on this library's
+   include path while it compiles every `.c` under `src/`. Wrap the whole
+   driver in
    `#if CONFIG_IMU_FOO` (never `#ifdef`); the HAL module check goes in
    `src/imu_priv.h`. Keep a `struct imu_bus` per device in your state and
    talk to the chip only through `imu_reg_read()`/`imu_reg_write()` or
@@ -64,7 +70,7 @@ A driver is a probe, a remove and one read function:
    `imu_err()` for anything the user needs to see.
 4. Guard your chip-specific calls with `imu->ops == &foo_ops`.
 5. Add `CONFIG_IMU_FOO` to the no-chip checks in `CMakeLists.txt` and
-   `src/imu_port_stm.c`, a `src/foo.c` line to `CMakeLists.txt`, a
+   `src/imu_port_stm.c`, a `src/foo/foo.c` line to `CMakeLists.txt`, a
    `config IMU_FOO` bool to `Kconfig`, `# IMU_FOO is not set` to both forges'
    defconfigs, and `test/esp/test_foo.c` and `test/stm/test_foo.c` targets
    to `test/Makefile`.

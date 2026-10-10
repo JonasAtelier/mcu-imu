@@ -10,6 +10,12 @@ also preserves `imu` as the ESP-IDF component directory.
 
 ## With forge
 
+stm-forge must be at `ee921c3` or later ("build: libraries may keep sources
+in src/ subfolders"); older ones only compile `src/*.c`, so the chip drivers
+in `src/<chip>/` are never built and the link fails with undefined
+references to the chip probes. esp-forge is unaffected: the component's
+CMakeLists lists its sources.
+
 With [esp-forge](https://github.com/JonasAtelier/esp-forge) or
 [stm-forge](https://github.com/JonasAtelier/stm-forge). The catalog line in
 `profiles/pkgversion` is the same for both:
@@ -54,9 +60,10 @@ the build warns. ESP-IDF 5.2 or newer is required for the `i2c_master` API.
 
 ## STM32 HAL
 
-Copy `include/` and `src/` into an STM32 project, compile
-`src/*.c`, add `include/` to the include path, and define what the forge
-would: `CMSIS_device_header` as your family header (`"stm32f4xx.h"` or
+Copy `include/` and `src/` into an STM32 project, compile every `.c` under
+`src/`, chip folders included, add `include/` and `src/` to the include path
+(`src/` only needs to reach this library's own sources), and define what the
+forge would: `CMSIS_device_header` as your family header (`"stm32f4xx.h"` or
 `"stm32f7xx.h"`), `USE_HAL_DRIVER`, and `CONFIG_IMU_<CHIP>=1` for each chip
 you want.
 
