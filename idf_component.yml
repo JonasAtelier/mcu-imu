@@ -1,5 +1,5 @@
 version: "0.2.0"
-description: Small Linux-IIO-style IMU subsystem for ESP-IDF and the STM32 HAL, with MPU-6050, ICM-45686 and BMI088 drivers.
+description: mcu-imu IMU subsystem for ESP-IDF and STM32 HAL, with MPU-6050, ICM-45686, BMI088 and WT901C-TTL drivers.
 license: MIT
 dependencies:
   idf:
