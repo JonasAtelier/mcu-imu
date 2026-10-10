@@ -247,9 +247,30 @@ static void imu_uart_detach(struct imu_bus *bus)
 	(void)bus;
 }
 
+/* Nothing sent: the part streams. A short count means the wait ran out. */
+static int imu_uart_receive(struct imu_bus *bus, uint8_t *rx, size_t rx_len,
+			    bool drop_stale)
+{
+	int n, ret;
+
+	if (!rx_len || rx_len > INT32_MAX)
+		return -EINVAL;
+	if (drop_stale) {
+		ret = imu_errno(uart_flush_input(bus->uart));
+		if (ret)
+			return ret;
+	}
+	n = uart_read_bytes(bus->uart, rx, (uint32_t)rx_len,
+			    imu_ticks(bus->timeout_ms));
+	if (n < 0)
+		return -EIO;
+	return (size_t)n < rx_len ? -ETIMEDOUT : 0;
+}
+
 static const struct imu_bus_ops imu_uart_ops = {
 	.kind = IMU_BUS_UART,
 	.transfer = imu_uart_transfer,
+	.receive = imu_uart_receive,
 	.detach = imu_uart_detach,
 };
 

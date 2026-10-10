@@ -1,7 +1,7 @@
 /*
  * Host-side check of the UART ops in src/imu_port_esp.c against
- * test/idf_stubs. No imu chip uses the UART yet, so nothing else reaches
- * them; I2C and SPI are covered by the chip tests beside this one.
+ * test/idf_stubs, framing by framing; I2C and SPI are covered by the chip
+ * tests beside this one. Also that receive() is UART-only.
  */
 #include <assert.h>
 #include <errno.h>
@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "driver/i2c_master.h"
 #include "driver/uart.h"
 #include "esp_err.h"
 
@@ -91,6 +92,23 @@ int uart_read_bytes(uart_port_t port, void *buf, uint32_t length,
 	return (int)n;
 }
 
+/* Enough of i2c_master to attach a bus and see it has no receive(). */
+esp_err_t i2c_master_bus_add_device(i2c_master_bus_handle_t bus,
+				    const i2c_device_config_t *config,
+				    i2c_master_dev_handle_t *out_handle)
+{
+	(void)bus;
+	(void)config;
+	*out_handle = (i2c_master_dev_handle_t)(void *)calls;
+	return ESP_OK;
+}
+
+esp_err_t i2c_master_bus_rm_device(i2c_master_dev_handle_t device)
+{
+	(void)device;
+	return ESP_OK;
+}
+
 static void test_uart(void)
 {
 	static const uint8_t args[2] = { 0x11, 0x22 };
@@ -150,9 +168,57 @@ static void test_uart(void)
 	imu_bus_detach(&bus);
 }
 
+/* receive(): nothing sent, stale input dropped only when asked. */
+static void test_receive(void)
+{
+	struct imu_bus bus, i2c;
+	uint8_t rx[3] = { 0 };
+
+	reset();
+	assert(imu_uart_attach(&bus, UART_PORT, 100) == 0);
+
+	in[0] = 0xEE;
+	in[1] = 0x01;
+	in_len = 2;
+	assert(imu_bus_receive(&bus, rx, 2, false) == 0);
+	assert(strcmp(calls, "R") == 0 && out_len == 0);
+	assert(rx[0] == 0xEE && rx[1] == 0x01);
+	assert(waited == 11);
+
+	reset();
+	in[0] = 0xEE;
+	in_len = 1;
+	assert(imu_bus_receive(&bus, rx, 1, true) == -ETIMEDOUT);
+	assert(strcmp(calls, "FR") == 0);
+
+	reset();
+	in[0] = 0x55;
+	in_len = 1;
+	assert(imu_bus_receive(&bus, rx, 3, false) == -ETIMEDOUT);
+
+	reset();
+	read_error = 1;
+	assert(imu_bus_receive(&bus, rx, 1, false) == -EIO);
+	reset();
+	flush_err = ESP_ERR_TIMEOUT;
+	assert(imu_bus_receive(&bus, rx, 1, true) == -ETIMEDOUT);
+	assert(strcmp(calls, "F") == 0);
+	reset();
+	assert(imu_bus_receive(&bus, rx, 0, false) == -EINVAL);
+	assert(calls[0] == '\0');
+	imu_bus_detach(&bus);
+
+	/* I2C has no receive(). */
+	assert(imu_i2c_attach(&i2c, (i2c_master_bus_handle_t)(void *)rx, 0x50,
+			      400000, 10) == 0);
+	assert(imu_bus_receive(&i2c, rx, 1, false) == -EOPNOTSUPP);
+	imu_bus_detach(&i2c);
+}
+
 int main(void)
 {
 	test_uart();
+	test_receive();
 	printf("test_port_esp: all passed\n");
 	return 0;
 }

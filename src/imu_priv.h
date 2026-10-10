@@ -23,6 +23,7 @@
 #define IMU_PRIV_H
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -62,6 +63,15 @@ struct imu_bus_ops {
 	 */
 	int (*transfer)(struct imu_bus *bus, uint8_t cmd, const uint8_t *tx,
 			size_t tx_len, uint8_t *rx, size_t rx_len);
+	/*
+	 * UART only; NULL on I2C and SPI. Wait for rx_len bytes with nothing
+	 * sent, for a part that streams on its own instead of answering a
+	 * command. drop_stale first drops whatever is already waiting, to
+	 * start on fresh data. Fewer than rx_len within the timeout is
+	 * -ETIMEDOUT; rx is then undefined.
+	 */
+	int (*receive)(struct imu_bus *bus, uint8_t *rx, size_t rx_len,
+		       bool drop_stale);
 	/* Undo the attach. The bus itself is the app's and is left alone. */
 	void (*detach)(struct imu_bus *bus);
 };
@@ -97,6 +107,9 @@ struct imu_bus {
 #endif
 #if !defined(HAL_SPI_MODULE_ENABLED) && CONFIG_IMU_ICM45686
 #error "IMU_ICM45686 needs the HAL SPI module: #define HAL_SPI_MODULE_ENABLED in the app's stm32f{4,7}xx_hal_conf.h, with stm32f{4,7}xx_hal_spi.c in the build"
+#endif
+#if !defined(HAL_UART_MODULE_ENABLED) && CONFIG_IMU_WT901
+#error "IMU_WT901 needs the HAL UART module: #define HAL_UART_MODULE_ENABLED in the app's stm32f{4,7}xx_hal_conf.h, with stm32f{4,7}xx_hal_uart.c in the build"
 #endif
 #if (!defined(HAL_I2C_MODULE_ENABLED) || !defined(HAL_SPI_MODULE_ENABLED)) && \
     CONFIG_IMU_BMI088
@@ -161,6 +174,15 @@ static inline int imu_reg_write(struct imu_bus *bus, uint8_t reg,
 				uint8_t value)
 {
 	return bus->ops->transfer(bus, reg, &value, 1, NULL, 0);
+}
+
+/* bus->ops->receive(), or -EOPNOTSUPP on a kind that has none. */
+static inline int imu_bus_receive(struct imu_bus *bus, uint8_t *rx,
+				  size_t rx_len, bool drop_stale)
+{
+	if (!bus->ops->receive)
+		return -EOPNOTSUPP;
+	return bus->ops->receive(bus, rx, rx_len, drop_stale);
 }
 
 static inline void imu_bus_detach(struct imu_bus *bus)

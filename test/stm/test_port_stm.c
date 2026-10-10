@@ -1,7 +1,7 @@
 /*
  * Host-side check of the UART ops in src/imu_port_stm.c against
- * test/hal_stubs. No imu chip uses the UART yet, so nothing else reaches
- * them; I2C and SPI are covered by the chip tests beside this one.
+ * test/hal_stubs; I2C and SPI are covered by the chip tests beside this one.
+ * Also that receive() is UART-only.
  */
 #include <assert.h>
 #include <errno.h>
@@ -147,9 +147,46 @@ static void test_uart(void)
 	imu_bus_detach(&bus);
 }
 
+/* receive(): nothing sent, stale input dropped only when asked. */
+static void test_receive(void)
+{
+	static I2C_HandleTypeDef i2c_handle;
+	struct imu_bus bus, i2c;
+	uint8_t rx[2] = { 0 };
+
+	assert(imu_uart_attach(&bus, &uart_handle, 100) == 0);
+
+	reset();
+	stale_bytes = 1;
+	memcpy(reply, "\x55\x51", 2);
+	assert(imu_bus_receive(&bus, rx, 2, false) == 0);
+	assert(strcmp(calls, "R") == 0 && sent_len == 0);
+	assert(stale_bytes == 1 && last_size == 2);
+	assert(rx[0] == 0x55 && rx[1] == 0x51);
+
+	reset();
+	stale_bytes = 2;
+	assert(imu_bus_receive(&bus, rx, 2, true) == 0);
+	assert(strcmp(calls, "OFFR") == 0 && stale_bytes == 0);
+
+	reset();
+	next_status = HAL_TIMEOUT;
+	assert(imu_bus_receive(&bus, rx, 2, false) == -ETIMEDOUT);
+	reset();
+	assert(imu_bus_receive(&bus, rx, 0, false) == -EINVAL);
+	assert(calls[0] == '\0');
+	imu_bus_detach(&bus);
+
+	/* I2C has no receive(). */
+	assert(imu_i2c_attach(&i2c, &i2c_handle, 0x50, 0, 10) == 0);
+	assert(imu_bus_receive(&i2c, rx, 1, false) == -EOPNOTSUPP);
+	imu_bus_detach(&i2c);
+}
+
 int main(void)
 {
 	test_uart();
+	test_receive();
 	printf("test_port_stm: all passed\n");
 	return 0;
 }

@@ -15,7 +15,8 @@
  * only when PKG_imu = y, so this is the CMakeLists' "IMU on, no chip"
  * warning on the ESP-IDF side.
  */
-#if !(CONFIG_IMU_MPU6050 || CONFIG_IMU_ICM45686 || CONFIG_IMU_BMI088)
+#if !(CONFIG_IMU_MPU6050 || CONFIG_IMU_ICM45686 || CONFIG_IMU_BMI088 || \
+      CONFIG_IMU_WT901)
 #warning "imu: no chip driver is selected; set IMU_<CHIP> = y under PKG_imu = y (or -DCONFIG_IMU_<CHIP>=1)"
 #endif
 
@@ -236,9 +237,22 @@ static int imu_uart_transfer(struct imu_bus *bus, uint8_t cmd,
 					  bus->timeout_ms));
 }
 
+/* Nothing sent: the part streams. A short read runs into HAL_TIMEOUT. */
+static int imu_uart_receive(struct imu_bus *bus, uint8_t *rx, size_t rx_len,
+			    bool drop_stale)
+{
+	if (!rx_len || rx_len > UINT16_MAX)
+		return -EINVAL;
+	if (drop_stale)
+		imu_uart_drop_input(bus);
+	return imu_errno(HAL_UART_Receive(bus->uart, rx, (uint16_t)rx_len,
+					  bus->timeout_ms));
+}
+
 static const struct imu_bus_ops imu_uart_ops = {
 	.kind = IMU_BUS_UART,
 	.transfer = imu_uart_transfer,
+	.receive = imu_uart_receive,
 	.detach = imu_hal_detach,
 };
 
