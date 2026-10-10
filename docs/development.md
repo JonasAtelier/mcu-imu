@@ -4,6 +4,53 @@
 
 Paths mentioned in this guide are relative to the repository root.
 
+## Repository layout
+
+```
+include/                    public API, the only directory apps include
+  imu.h                     struct imu_dev, imu_read(), imu_time_us()
+  imu_log.h                 imu_err/warn/info/dbg, imu_log_sample()
+  mpu6050.h icm45686.h bmi088.h wt901.h
+                            one header per chip: probe, remove, extras
+src/                        private to the library
+  imu.c                     the core: timestamp, ops.read, mount rotation
+  imu_log.c                 imu_log_sample()
+  imu_priv.h                bus ops, attach functions, waits; shared by all chips
+  imu_port_esp.c            that header on ESP-IDF; empty elsewhere
+  imu_port_stm.c            that header on the STM32 HAL; empty under ESP-IDF
+  mpu6050/                  mpu6050.c   mpu6050_regs.h   mpu6050_math.h   mpu6050_priv.h
+  icm45686/                 icm45686.c  icm45686_regs.h  icm45686_math.h  icm45686_priv.h
+  bmi088/                   bmi088.c  bmi088_bus.c  bmi088_regs.h  bmi088_priv.h
+  wt901/                    wt901.c     wt901_proto.h
+test/                       host tests, `make -C test test`
+  test_<chip>_math.c        maths tests: no bus and no platform API
+  wt901_cases.h             WT901 cases, shared by esp/ and stm/
+  esp/                      suites on idf_stubs/, through imu_port_esp.c
+  stm/                      suites on hal_stubs/, through imu_port_stm.c
+  idf_stubs/  hal_stubs/    the slice of ESP-IDF and of the HAL the code calls
+examples/
+  esp/<chip-or-board>/      ESP-IDF projects: bmi088, bmi088_spi, icm45686, mpu6050
+  stm/<chip-or-board>/      STM32 snippets: bmi088, bmi088_spi, icm45686, mpu6050
+docs/                       the five guides; datasheet PDFs here are gitignored
+assets/                     README and chip-reference figures
+CMakeLists.txt              ESP-IDF only; stm-forge globs src/**/*.c instead
+Kconfig                     IMU and IMU_<CHIP>, for ESP-IDF and both forges' menus
+idf_component.yml           ESP-IDF component manifest
+```
+
+Naming inside `src/<chip>/`, the same in every category library:
+
+| File | Holds |
+|---|---|
+| `<chip>.c` | the driver: probe, remove, the `ops.read`, the chip's extras; may split into `<chip>_<part>.c` (e.g. `bmi088_bus.c`) |
+| `<chip>_regs.h` | register map: addresses, bit fields, values, each with its datasheet citation |
+| `<chip>_proto.h` | serial protocol: command bytes, frames, checksums, for parts without registers |
+| `<chip>_math.h` | pure conversions, compiled and asserted on the host by `test/<chip>_math` tests |
+| `<chip>_priv.h` | driver state, only if needed |
+
+A chip has `_regs.h` or `_proto.h`, never both; `_math.h` and `_priv.h` only
+when it needs them. Everything in `src/` is private: apps see `include/` only.
+
 ## Platform ports
 
 It replaces esp-imu and stm-imu. The chip
@@ -72,8 +119,8 @@ A driver is a probe, a remove and one read function:
 5. Add `CONFIG_IMU_FOO` to the no-chip checks in `CMakeLists.txt` and
    `src/imu_port_stm.c`, a `src/foo/foo.c` line to `CMakeLists.txt`, a
    `config IMU_FOO` bool to `Kconfig`, `# IMU_FOO is not set` to both forges'
-   defconfigs, and `test/esp/test_foo.c` and `test/stm/test_foo.c` targets
-   to `test/Makefile`.
+   defconfigs, and `test/esp/test_foo.c` and `test/stm/test_foo.c` (and
+   `test/test_foo_math.c` for its maths header) targets to `test/Makefile`.
 
 ## Tests
 
@@ -82,26 +129,27 @@ make -C test test
 ```
 
 Host-only; no toolchain, HAL or ESP-IDF needed. Every test of both old
-libraries runs, against its own stubs: `test/esp/` through
+libraries runs, against its own stubs, in the layout of
+[Repository layout](#repository-layout): `test/esp/` through
 `src/imu_port_esp.c` and `test/idf_stubs/`, `test/stm/` through
-`src/imu_port_stm.c` and `test/hal_stubs/`. The two maths tests touch no
-platform and run once. Nothing is checked against real silicon. The table
+`src/imu_port_stm.c` and `test/hal_stubs/`. The maths tests in `test/` touch
+no bus or platform API and run once. Nothing is checked against real silicon. The table
 describes the `test/stm/` binaries; each `test/esp/` one checks the same
 chip through ESP-IDF's calls instead (`i2c_master_*`, `spi_device_*`,
 `esp_rom_delay_us()`, `vTaskDelay()`).
 
 | Binary | Checks |
 |---|---|
-| `test_port_esp`, `test_port_stm` | the UART ops of each port, framing case by case: an ESP-IDF port without an installed driver refused; stale input dropped before the send (on the HAL: overrun cleared, data register read empty); command and arguments in one send; no read for a command without an answer, none after a failed send; a short answer as `-ETIMEDOUT`; the read wait in ticks rounded up; driver and HAL failures mapped to errno; too much to send refused before the line is touched; `receive()` sends nothing, drops stale input only when asked, a short count is `-ETIMEDOUT`, and I2C has none (`-EOPNOTSUPP`) |
-| `test_core` | mount matrix is `M·v`, not the transpose; all-zero is identity; errno passes through and the sample is untouched on error; the default clock is `HAL_GetTick()` in µs; log prefix and `imu_log_sample()` format, including 64-bit timestamps without `%lld` |
+| `esp/test_port_esp`, `stm/test_port_stm` | the UART ops of each port, framing case by case: an ESP-IDF port without an installed driver refused; stale input dropped before the send (on the HAL: overrun cleared, data register read empty); command and arguments in one send; no read for a command without an answer, none after a failed send; a short answer as `-ETIMEDOUT`; the read wait in ticks rounded up; driver and HAL failures mapped to errno; too much to send refused before the line is touched; `receive()` sends nothing, drops stale input only when asked, a short count is `-ETIMEDOUT`, and I2C has none (`-EOPNOTSUPP`) |
+| `{esp,stm}/test_core` | mount matrix is `M·v`, not the transpose; all-zero is identity; errno passes through and the sample is untouched on error; the default clock is `HAL_GetTick()` in µs; log prefix and `imu_log_sample()` format, including 64-bit timestamps without `%lld` |
 | `test_mpu6050_math` | scale tables, the 36.53 °C offset, and the rate/filter interaction — the same divider means different rates under different filters, and unreachable rates are refused |
-| `test_mpu6050` | a fake MPU-6050 behind a fake HAL: probe, reset-then-wake-onto-PLL, the burst layout with distinct values per axis so a wrong offset cannot pass by luck, the 7-bit address shifted for the HAL, `-ENXIO`/`-EAGAIN`/`-ETIMEDOUT`/`-EIO` mapping, no allocation on a refused probe, teardown leaves it asleep, waits ask for at least what the chip needs, another chip's `imu_dev` is refused |
+| `{esp,stm}/test_mpu6050` | a fake MPU-6050 behind a fake HAL: probe, reset-then-wake-onto-PLL, the burst layout with distinct values per axis so a wrong offset cannot pass by luck, the 7-bit address shifted for the HAL, `-ENXIO`/`-EAGAIN`/`-ETIMEDOUT`/`-EIO` mapping, no allocation on a refused probe, teardown leaves it asleep, waits ask for at least what the chip needs, another chip's `imu_dev` is refused |
 | `test_icm45686_math` | scale tables run backwards and each step halves; the ODR table |
-| `test_icm45686` | a fake ICM-45686 modelling the SPI read bit, the software chip select, soft reset, the indirect register path and the 14-byte burst — accel and gyro must come from **one** transaction; a handle not in mode 3 or not 8-bit is refused |
-| `test_bmi088_core` | the chip half against a mock bus: write sequence and delays, scaling, temperature decode and `-ERANGE`, outputs untouched on error, `imu_read()` in SI, an app's `imu_time_us()` replacing the weak default |
+| `{esp,stm}/test_icm45686` | a fake ICM-45686 modelling the SPI read bit, the software chip select, soft reset, the indirect register path and the 14-byte burst — accel and gyro must come from **one** transaction; a handle not in mode 3 or not 8-bit is refused |
+| `{esp,stm}/test_bmi088_core` | the chip half against a mock bus: write sequence and delays, scaling, temperature decode and `-ERANGE`, outputs untouched on error, `imu_read()` in SI, an app's `imu_time_us()` replacing the weak default |
 | `test_wt901_math` | one accelerometer frame worked by hand, SUM included; any changed byte, or an unknown type even with its SUM made to match, rejected; low-byte-first signed values; the §6.1.2-6.1.4 full scales |
-| `test_wt901` | one fake module in `test/wt901_cases.h`, run through both ports by a little glue each: probe writes nothing; silence `-ENXIO`, bad SUMs only `-EBADMSG`, no gyroscope frames `-ENODATA`, a stream that stops `-ETIMEDOUT`, none of them allocating; scales and temperature; stale input dropped; frames in any order with other types between; a read starting mid-frame; noise full of 0x55s; a bad-SUM frame skipped; angles; command bytes; `-EBUSY` and foreign devices refused |
-| `test_bmi088` | the HAL transport against fake dies: the accelerometer's SPI dummy byte, its switch to SPI on a chip-select rising edge (at power-on and again after soft reset), errno mapping, a failed probe leaks nothing, no 0 ms delays, bad bus configs refused |
+| `{esp,stm}/test_wt901` | one fake module in `test/wt901_cases.h`, run through both ports by a little glue each: probe writes nothing; silence `-ENXIO`, bad SUMs only `-EBADMSG`, no gyroscope frames `-ENODATA`, a stream that stops `-ETIMEDOUT`, none of them allocating; scales and temperature; stale input dropped; frames in any order with other types between; a read starting mid-frame; noise full of 0x55s; a bad-SUM frame skipped; angles; command bytes; `-EBUSY` and foreign devices refused |
+| `{esp,stm}/test_bmi088` | the HAL transport against fake dies: the accelerometer's SPI dummy byte, its switch to SPI on a chip-select rising edge (at power-on and again after soft reset), errno mapping, a failed probe leaks nothing, no 0 ms delays, bad bus configs refused |
 
 All build under `-std=gnu11 -Wall -Wextra -Werror -pedantic`, with
 `-Wl,--wrap` (GNU ld) to count allocations and capture `printf()`.

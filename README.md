@@ -211,7 +211,8 @@ Your application owns bus setup, scheduling, and locking.
 | [Development](docs/development.md) | Platform ports, bus abstraction, adding a driver and test coverage |
 
 Public interfaces live in [include/](include/); chip drivers and platform ports
-live in [src/](src/).
+live in [src/](src/). The [repository layout](docs/development.md#repository-layout)
+maps every directory and the file-naming rule for chip folders.
 
 ## Tests
 
