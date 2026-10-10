@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="580" viewBox="0 0 960 580" role="img" aria-labelledby="title desc">
+<title id="title">Angular rate changes during a turn; supported acceleration stays constant</title>
+<desc id="desc">Idealized top view of a horizontal IMU centered on a vertical axis, body Z up toward the viewer. It rests for two seconds, turns positive 90 degrees counterclockwise over two seconds, then rests for two seconds. Acceleration is always zero, zero, plus 9.81 meters per second squared. Gyro Z is zero, plus 0.785 radians per second, then zero. The six-second loop resets as a replay, not a measured reverse turn. Reduced motion shows the final stopped pose.</desc>
+<style>
+text { font-family: sans-serif; fill: #eaf1f7; font-size: 18px; }
+.muted { fill: #afc1d2; } .small { font-size: 16px; } .heading { font-size: 26px; font-weight: 700; }
+.rotor { transform: rotate(-90deg); animation: turn 6s linear infinite; }
+.phase1,.phase2 { opacity: 0; } .phase3 { opacity: 1; }
+.phase1 { animation: first 6s steps(1,end) infinite; }
+.phase2 { animation: second 6s steps(1,end) infinite; }
+.phase3 { animation: third 6s steps(1,end) infinite; }
+@keyframes turn { 0%,33.333333% { transform: rotate(0deg); } 66.666667%,100% { transform: rotate(-90deg); } }
+@keyframes first { 0% { opacity:1; } 33.333333%,100% { opacity:0; } }
+@keyframes second { 0% { opacity:0; } 33.333333% { opacity:1; } 66.666667%,100% { opacity:0; } }
+@keyframes third { 0% { opacity:0; } 66.666667%,100% { opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .rotor,.phase1,.phase2,.phase3 { animation:none; } }
+</style>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8Z" fill="#70e1b2"/></marker></defs>
+<rect width="960" height="580" rx="16" fill="#0d2238"/>
+<text x="32" y="44" class="heading">A quarter turn: rate is not orientation</text>
+<text x="32" y="76" class="muted">Idealized illustration · level sensor · no translation · not captured data</text>
+<rect x="32" y="100" width="410" height="342" rx="12" fill="#16324b"/>
+<text x="56" y="132">Top view · +Z up, toward you</text>
+<circle cx="230" cy="275" r="102" fill="none" stroke="#46627b" stroke-dasharray="5 7"/>
+<g transform="translate(230 275)"><g class="rotor">
+<rect x="-56" y="-40" width="112" height="80" rx="12" fill="#285b58" stroke="#70e1b2" stroke-width="2"/>
+<path d="M0 0 H100" fill="none" stroke="#70e1b2" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M0 0 V-95" fill="none" stroke="#70e1b2" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="104" y="6" fill="#70e1b2">+X</text><text x="-13" y="-105">+Y</text>
+</g></g>
+<circle cx="230" cy="275" r="10" fill="#0d2238" stroke="#eaf1f7" stroke-width="2"/><circle cx="230" cy="275" r="3" fill="#eaf1f7"/>
+<text x="56" y="402" class="small muted">Sensing point centered on rotation axis</text>
+<rect x="466" y="100" width="462" height="150" rx="12" fill="#16324b"/>
+<text x="490" y="135">Accelerometer · specific force</text>
+<text x="490" y="176" class="heading">(0, 0, +9.81) m/s²</text>
+<text x="490" y="215" class="small muted">Support against gravity; constant in this turn</text>
+<rect x="466" y="266" width="462" height="176" rx="12" fill="#16324b"/>
+<text x="490" y="301">Gyroscope · angular rate</text>
+<g class="phase1"><text x="490" y="345" class="heading">(0, 0, 0) rad/s</text><text x="490" y="390" class="muted">Still · starting heading 0°</text></g>
+<g class="phase2"><text x="490" y="345" class="heading">(0, 0, +0.785) rad/s</text><text x="490" y="390" class="muted">Turning +45°/s · counterclockwise</text></g>
+<g class="phase3"><text x="490" y="345" class="heading">(0, 0, 0) rad/s</text><text x="490" y="390" class="muted">Stopped · heading remains +90°</text></g>
+<rect x="32" y="466" width="896" height="46" rx="8" fill="#16324b"/>
+<g fill="#285b58"><rect class="phase1" x="32" y="466" width="298" height="46" rx="8"/><rect class="phase2" x="330" y="466" width="299" height="46" rx="8"/><rect class="phase3" x="629" y="466" width="299" height="46" rx="8"/></g>
+<text x="56" y="496">0–2 s · still</text><text x="354" y="496">2–4 s · turn +90°</text><text x="653" y="496">4–6 s · still</text>
+<text x="32" y="551" class="small muted">6-second replay: reset is not a reverse turn. Drawn heading is not an API output.</text>
+</svg>
