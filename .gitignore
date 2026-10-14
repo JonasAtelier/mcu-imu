@@ -22,3 +22,9 @@ test/stm/test_port_stm
 test/test_wt901_math
 test/esp/test_wt901
 test/stm/test_wt901
+test/test_bmi270_math
+test/esp/test_bmi270
+test/stm/test_bmi270
+test/test_icm42688_math
+test/esp/test_icm42688
+test/stm/test_icm42688
