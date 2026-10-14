@@ -86,6 +86,76 @@ Names are from table 14 of the [Bosch BMI088 datasheet](https://www.bosch-sensor
 MPU-6050 and ICM-45686 names are the chips' usual ones; neither datasheet
 ships in this repo.
 
+### ICM-42688-P — `examples/esp/icm42688` (SPI)
+
+| pin | goes to | note |
+|---|---|---|
+| VDD | 3.3 V | 1.71–3.6 V |
+| VDDIO | 3.3 V | 1.71–3.6 V, and it sets the logic level |
+| GND | GND | shared ground; pin 7 (RESV) to GND too |
+| AP_CS | GPIO 10 | chip select |
+| AP_SCLK | GPIO 12 | SPI clock |
+| AP_SDI | GPIO 11 | MOSI |
+| AP_SDO | GPIO 13 | MISO |
+| INT1 | a GPIO, or nothing | data ready, if `data_ready_int1.enable` |
+| INT2 / FSYNC / CLKIN | GND | FSYNC unused: "Connect to GND if FSYNC not used" |
+| RESV (2, 3, 10, 11) | nothing or GND | |
+
+SPI mode 0 or 3, 8-bit frames, at most 24 MHz; the example runs at 8 MHz.
+
+### ICM-42688-P — `examples/stm/icm42688` (I2C)
+
+| pin | goes to | note |
+|---|---|---|
+| VDD, VDDIO | 3.3 V | 1.71–3.6 V each |
+| GND | GND | pin 7 (RESV) to GND too |
+| AP_CS | VDDIO | high: "Connect to VDDIO if using AP I3CSM / I2C interface" (Table 10) |
+| AP_SCL | PB8 | I2C1_SCL, AF4, open drain |
+| AP_SDA | PB9 | I2C1_SDA, AF4, open drain. **External pull-ups on SDA and SCL** |
+| AP_AD0 | GND | address: GND is 0x68, VDDIO is 0x69. **An MPU-6050, BMI270 or BMI088 gyroscope at 0x68 on the same bus collides with this** |
+| INT1 | an EXTI pin, or nothing | data ready on INT1, as the example configures it: push-pull, active high, pulsed |
+| INT2 / FSYNC / CLKIN | GND | FSYNC unused |
+
+I2C at up to 1 MHz. Names, pins and ranges are from the ICM-42688-P
+datasheet (DS-000347 rev. 1.6): Table 10 and Figure 5 for the pins, Table 3
+for the supplies, 9.3 and 9.6 for the interfaces.
+
+### BMI270 — `examples/esp/bmi270` (I2C)
+
+| pin | goes to | note |
+|---|---|---|
+| VDD | 3.3 V | core supply, 1.71–3.6 V |
+| VDDIO | 3.3 V | interface supply, 1.2–3.6 V, and it sets the logic level |
+| GND, GNDIO | GND | shared ground, always |
+| CSB | VDDIO | stays high: the interface is I2C after power-up and turns SPI on the first CSB rising edge |
+| SCX | SCL | GPIO 22 in the example |
+| SDX | SDA | GPIO 21 in the example. **External pull-ups on SDA and SCL**; the example only turns on the ESP32's weak ones |
+| SDO | GND | address: GND is 0x68, VDDIO is 0x69. **An MPU-6050, or a BMI088 gyroscope, at 0x68 on the same bus collides with this** |
+| INT1 | a GPIO, or nothing | data ready, if `data_ready_int1.enable`; else leave open |
+| INT2, ASDx, ASCx, OCSB, OSDO | nothing | INT2, the auxiliary and the OIS interface: not used by this driver; leave open |
+
+I2C at up to 1 MHz (Fast-mode Plus).
+
+### BMI270 — `examples/stm/bmi270` (SPI)
+
+| pin | goes to | note |
+|---|---|---|
+| VDD | 3.3 V | core supply, 1.71–3.6 V |
+| VDDIO | 3.3 V | interface supply, 1.2–3.6 V |
+| GND, GNDIO | GND | shared ground |
+| CSB | PD14, with a pull-up | chip select. The interface starts as I2C after power-up and after every soft reset; the probe's throwaway reads give it the rising edges that switch it to SPI |
+| SCX | PA5 | SPI1_SCK, AF5 |
+| SDX | PA7 | SPI1_MOSI |
+| SDO | PA6 | SPI1_MISO |
+| INT1 | an EXTI pin, or nothing | data ready on INT1, as the example configures it: push-pull, active high |
+| INT2, ASDx, ASCx, OCSB, OSDO | nothing | leave open |
+
+SPI mode 0 (the example) or 3, 8-bit frames, at most 10 MHz.
+
+Names and ranges are from the BMI270 datasheet (BST-BMI270-DS000-08, rev.
+1.6): section 7.1 and Table 17 for the pins, Table 1 for the supplies, 6.3
+to 6.5 for the interfaces.
+
 ### WT901C-TTL — no example
 
 Pin names are the WT901 core's, from §3 of `docs/WT901.pdf` (p.5); the cased

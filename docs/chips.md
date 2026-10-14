@@ -297,6 +297,248 @@ the example only turns on the STM32's weak internal ones.
 PS to GND, and **pull-ups on both chip selects** so neither die is selected
 while the STM32 boots. Mode 0 and mode 3, up to 10 MHz.
 
+## ICM-42688-P
+
+TDK InvenSense's 6-axis IMU: an accelerometer to 16 g and a gyroscope to
+2000 dps at one rate up to 32 kHz, over I2C (`examples/stm/icm42688`) or SPI
+(`examples/esp/icm42688`). Every register value, bit and timing is from the
+ICM-42688-P datasheet, DS-000347 rev. 1.6, cited in
+`src/icm42688/icm42688_regs.h`. Nothing is shared with the ICM-45686 driver:
+the register maps have nothing in common (WHO_AM_I `0x47` at 0x75 here,
+register banks instead of indirect access). On the STM32 HAL each probe is
+built with its own module, as for the BMI270.
+
+| Function | Does |
+|---|---|
+| `icm42688_probe_i2c(&imu, &bus_cfg, cfg)` | Presence on I2C, WHO_AM_I, soft reset, I2C settings, filters, ranges, rate, interrupt, both sensors on |
+| `icm42688_probe_spi(&imu, &bus_cfg, cfg)` | The same over SPI |
+| `icm42688_remove(&imu)` | Both sensors off, release the driver's state |
+| `imu_read(&imu, &s)` | One burst: temperature, accel, gyro, mount applied |
+| `icm42688_read_raw(&imu, a, g, &t)` | The same burst as counts |
+| `icm42688_data_ready(&imu, &b)` | `INT_STATUS.DATA_RDY_INT`, cleared by the read |
+| `icm42688_set_ranges(&imu, a, g)` / `_set_odr(&imu, odr)` | Full scales or the rate, while running |
+| `icm42688_set_power(&imu, accel, gyro)` | Either sensor on, low noise, or off |
+| `icm42688_accel_sensitivity` / `_gyro_sensitivity` | LSB/g and LSB/dps for the ranges set |
+| `icm42688_aaf_bandwidth_hz(delt)` | The 3 dB bandwidth of an anti-alias row |
+| `icm42688_reg_read` / `_reg_write` | Any register of any bank: FIFO, APEX, notch filter, offsets |
+
+`cfg` is required: every field is the register code the datasheet gives,
+named in the enums. One rate serves both sensors, because at two rates the
+slower one's registers hold invalid samples in between (14.34).
+
+### Banks
+
+The registers sit in user banks 0, 1, 2 and 4 (chapter 13), chosen by
+`REG_BANK_SEL`, which every bank has at 0x76 (14.59). The driver works in
+bank 0, goes to bank 1 for the gyroscope's anti-alias filter and the I2C
+setting in `INTF_CONFIG6`, to bank 2 for the accelerometer's anti-alias
+filter, and back to bank 0 at once each time, failure or not.
+
+### The probe, and what may change while running
+
+Section 12.9: while the sensors run, only the rate, full scale and power
+mode may change; everything else is written with both off. So the probe:
+
+1. reads WHO_AM_I (`0x47`, 14.58), `-ENODEV` otherwise, before writing
+   anything;
+2. soft-resets (`DEVICE_CONFIG.SOFT_RESET_CONFIG`) and waits 1 ms (14.1);
+3. on I2C only, applies section 12.3's I2C settings: `DRIVE_CONFIG` slew
+   rates 1 and 1 (14.2), and I3C SDR and DDR off in `INTF_CONFIG6` (bank 1,
+   15.19); on SPI the reset values are already the table's;
+4. pins big-endian data in `INTF_CONFIG0` (14.34), the reset value;
+5. sets the anti-alias filters, the UI filters, ranges and rate, the
+   interrupt, all with the sensors off;
+6. turns both sensors on in low-noise mode (`PWR_MGMT0`, 14.36) and issues
+   no write for the next 200 us, as that section asks.
+
+After probe `icm42688_set_ranges()`, `_set_odr()` and `_set_power()` are the
+calls 12.9 allows; the filters and the interrupt stay as the probe set them.
+The gyroscope must stay on 45 ms once on (14.36).
+
+### Filters
+
+**Anti-alias** (5.3), for each sensor apart: `ICM42688_AAF_DEFAULT` keeps
+the chip's reset setting -- row 13, 585 Hz, on the gyroscope (15.3-15.5);
+row 24, 1163 Hz, on the accelerometer (16.1-16.3) -- `ICM42688_AAF_OFF`
+bypasses it, and 1 to 63 picks the row of the table in 5.3 with that DELT:
+42 Hz to 3979 Hz. The driver carries the table as printed: in most rows
+`DELTSQR` is not `DELT` squared. Section 12.4: the anti-alias and notch
+filters only work in low-noise mode, which is the only mode this driver
+uses.
+
+**UI filter** (5.5): order 1, 2 or 3 (`GYRO_CONFIG1` 14.39, `ACCEL_CONFIG1`
+14.41) and bandwidth (`GYRO_ACCEL_CONFIG0` 14.40): ODR/2, max(400 Hz,
+ODR)/4 down to /40, or the two low-latency settings. The reset values are
+2nd order and max(400 Hz, ODR)/4. The reserved bits beside the order -- the
+DEC2_M2 order and the temperature filter -- are read and written back.
+
+| Full scale | Accelerometer LSB/g (Table 2) | Full scale | Gyroscope LSB/dps (Table 1) |
+|---|---|---|---|
+| ±16 g | 2048 | ±2000 dps | 16.4 |
+| ±8 g | 4096 | ±1000 dps | 32.8 |
+| ±4 g | 8192 | ±500 dps | 65.5 |
+| ±2 g | 16384 | ±250 dps | 131 |
+| | | ±125 dps | 262 |
+| | | ±62.5 dps | 524.3 |
+| | | ±31.25 dps | 1048.6 |
+| | | ±15.625 dps | 2097.2 |
+
+The gyroscope figures are Table 1's, rounded as printed. Rates (14.37-14.38):
+32 kHz down to 12.5 Hz and 500 Hz; the accelerometer's 6.25 Hz and slower are
+low-power only and refused.
+
+### The burst, temperature
+
+`TEMP_DATA1` (0x1D) to `GYRO_DATA_Z0` (0x2A), 14 bytes, high byte first:
+temperature, accelerometer, gyroscope of one sample. Temperature is
+TEMP_DATA / 132.48 + 25 °C (14.6). On SPI bit 7 of the address reads and the
+data follows the address with no dummy byte (9.6); on I2C a repeated start
+(9.4).
+
+### The data-ready interrupt
+
+`data_ready_int1` sets `INT_CONFIG` (14.3) for INT1: polarity, push-pull or
+open drain, pulsed or latched; `INT_CONFIG0` (14.49) so that a latched pin
+clears on an `INT_STATUS` read or a sensor data read, which every
+`imu_read()` is; `INT_CONFIG1` (14.50) with the 8 us pulse and no de-assert
+time, required at 4 kHz and up and allowed below, and `INT_ASYNC_RESET`
+cleared as section 12.6 asks; and `INT_SOURCE0` (14.51) with data ready alone
+routed to INT1. With `enable` false the interrupt registers stay as reset.
+
+### What is not here
+
+The FIFO (as on the ICM-45686), APEX, the notch filter's settings, user
+offsets, self-test, the external clock and I3C. `icm42688_reg_read()` and
+`_reg_write()` reach every bank; mind 12.9 while the sensors run.
+
+## BMI270
+
+Bosch's single-die IMU: an accelerometer to 16 g and a gyroscope to
+2000 dps, over I2C (`examples/esp/bmi270`) or SPI (`examples/stm/bmi270`).
+Every register value, bit and timing is from the BMI270 datasheet,
+BST-BMI270-DS000-08 rev. 1.6 (March 2026), cited in
+`src/bmi270/bmi270_regs.h`. On the STM32 HAL each probe is built with its
+own module: `bmi270_probe_i2c()` with `HAL_I2C_MODULE_ENABLED`,
+`bmi270_probe_spi()` with `HAL_SPI_MODULE_ENABLED`; one of them is enough.
+
+| Function | Does |
+|---|---|
+| `bmi270_probe_i2c(&imu, &bus_cfg, cfg)` | Presence on I2C, CHIP_ID `0x24`, soft reset, the configuration upload, configure, start |
+| `bmi270_probe_spi(&imu, &bus_cfg, cfg)` | The same over SPI, with a throwaway read before and after the reset that switches the interface to SPI |
+| `bmi270_remove(&imu)` | All sensors off (PWR_CTRL 0), release the driver's state |
+| `imu_read(&imu, &s)` | One burst: accel, gyro and temperature, mount applied; NaN for an invalid temperature |
+| `bmi270_read_raw(&imu, a, g, &t)` | The same burst as counts, gyro X already cross-axis corrected |
+| `bmi270_data_ready(&imu, &flags)` | `STATUS.drdy_acc` / `drdy_gyr` as `BMI270_DATA_READY_ACCEL` / `_GYRO` |
+| `bmi270_set_ranges(&imu, a, g)` | Change either full scale |
+| `bmi270_set_odr(&imu, a, g)` | Change either rate, keeping the filter settings |
+| `bmi270_accel_sensitivity` / `_gyro_sensitivity` | LSB/g and LSB/dps for the ranges set |
+| `bmi270_reg_read` / `_reg_write` | Any register: FIFO, feature engine, self-test |
+
+`cfg` may be `NULL` for the chip's own reset values: ±8 g at 100 Hz, ±2000
+dps at 200 Hz, both filters normal, no interrupt.
+
+### The configuration file
+
+The BMI270 does not measure until Bosch's 8 KB configuration file has been
+written into it, at every power-up and every soft reset (section 4.4). The
+library carries it, unchanged, in `src/bmi270/bmi270_config_file.c`: from
+Bosch's BMI270 Sensor API, commit `41129fc` (`bmi270.c` v2.86.1), BSD-3-Clause.
+The file's header and the repository's [NOTICE](../NOTICE) give its origin,
+SHA-256 and Bosch's licence; a firmware built with `IMU_BMI270` contains it,
+so ship that notice with the binary.
+
+The probe follows section 4.4, in order:
+
+1. SPI only: one read whose answer is thrown away, then 200 us: the
+   interface is I2C after power-up and switches to SPI on a CSB rising edge
+   (6.3).
+2. CHIP_ID must read `0x24` (5.2.1), else `-ENODEV`.
+3. Soft reset (`CMD` = `0xB6`, 5.2.86), 2 ms, and on SPI the throwaway read
+   again (4.17). The reset comes first because `INIT_CTRL` may be set to 1
+   only once after a reset (4.4), and a second probe would otherwise do it a
+   second time.
+4. `PWR_CONF.adv_power_save` = 0, then 450 us (4.4).
+5. `INIT_CTRL` = 0, the file, `INIT_CTRL` = 1. The bus carries at most 31
+   bytes after the address, so the file goes in 30-byte pieces, each after
+   its offset in 16-bit words in `INIT_ADDR_0` (bits 3:0) and `INIT_ADDR_1`
+   (bits 11:4) (4.4 footnote 4, 5.2.65-5.2.67): 274 pieces, 548 writes.
+6. `INTERNAL_STATUS.message` is polled every millisecond until it reads
+   `init_ok` (1), for 21 polls, as the datasheet gives it 20 ms at most
+   (4.4, 5.2.33): `-ETIMEDOUT` if it still reads 0, `-EPROTO` for any
+   failure code.
+7. `GYR_CAS.factor_zx` is read from feature page 0 (5.2.39-5.2.40).
+8. The datasheet's normal mode, its quick start step 3 (section 3): PWR_CTRL
+   accel, gyro and temperature on; ACC_CONF, ACC_RANGE, GYR_CONF, GYR_RANGE;
+   PWR_CONF with advanced power save off. `gyro_low_noise` sets
+   `gyr_noise_perf`: performance mode (Table 6).
+
+Every write is followed by the 2 us idle the interface needs in normal mode
+(Table 19, Table 20). On the STM32 HAL, whose shortest wait is a
+millisecond, that makes the upload about half a second.
+
+### SPI reads: one dummy byte, as on the BMI088 accelerometer
+
+On SPI the BMI270 sends one dummy byte after the address before the first
+register's value (6.4, Figure 13: "for a multiple read operation of n bytes,
+n+1 bytes have to be read, the first has to be dropped"). That is the
+BMI088 accelerometer's rule; the BMI088 gyroscope has none. On I2C there is
+no dummy byte. Writes have none on either bus.
+
+### Rates, ranges, filters
+
+The driver runs both sensors with filter performance on (`acc_filter_perf`,
+`gyr_filter_perf`), so the rates are those of normal and performance mode:
+accelerometer 12.5 Hz to 1.6 kHz (4.6.4), gyroscope 25 Hz to 3.2 kHz
+(4.6.11). The low-power rates below those are refused with `-EINVAL`.
+`accel_filter` is `acc_bwp` (OSR4, OSR2, normal, CIC) and `gyro_filter`
+`gyr_bwp` (OSR4, OSR2, normal), 5.2.41 and 5.2.43; the cutoff for each rate
+in normal filter mode is in Tables 7 and 10. A change after probe lands when
+the chip's sampling grid allows (4.6.16).
+
+| Range | Accelerometer LSB/g (Table 2) | Range | Gyroscope LSB/dps (Table 3) |
+|---|---|---|---|
+| ±2 g | 16384 | ±2000 dps | 16.384 |
+| ±4 g | 8192 | ±1000 dps | 32.768 |
+| ±8 g | 4096 | ±500 dps | 65.536 |
+| ±16 g | 2048 | ±250 dps | 131.072 |
+| | | ±125 dps | 262.144 |
+
+### One burst, and what it clears
+
+`imu_read()` reads `DATA_8` (0x0C) to `TEMPERATURE_1` (0x23), 24 bytes, in
+one transfer, so the three belong to one moment. The registers in between
+are read too, and reading them clears `EVENT` (5.2.27) and
+`INT_STATUS_0`/`_1` (5.2.28-5.2.29). The driver uses none of them; with a
+latched data-ready interrupt, reading the sample is what releases the pin.
+
+**Temperature** is 23 °C at 0 and 1/512 K per LSB (Table 4, 4.6.14). The
+code `0x8000` means invalid (5.2.34); the word is valid only while the
+gyroscope is in normal mode (same section). `imu_read()` then gives NaN for
+`temp_c` and still returns the rest -- unlike the BMI088, whose driver fails
+the whole `imu_read()` with `-ERANGE` for its invalid code. Losing a whole
+motion sample over the temperature would be the worse trade.
+
+**Gyroscope X** is corrected for its cross-axis sensitivity to Z, as the
+datasheet requires: x − factor_zx · z / 2⁹ (4.6.10), with factor_zx the
+7-bit signed `GYR_CAS` read at probe. Integer division and the 16-bit limit
+follow Bosch's `comp_gyro_cross_axis_sensitivity()`.
+
+### The data-ready interrupt
+
+`data_ready_int1` routes data ready to INT1 (4.9): `INT1_IO_CTRL` output
+enable, level and push-pull or open drain (5.2.58), `INT_LATCH` (5.2.60),
+then `INT_MAP_DATA.drdy_int1` (5.2.63). Not latched, the chip drops the pin
+after 1/6400 s by itself (4.6.6); latched, it holds it until
+`INT_STATUS_1` is read, which every `imu_read()` does. With `enable` false
+the pin stays off. `bmi270_data_ready()` polls `STATUS` either way.
+
+### What is not here
+
+The FIFO, the feature engine (any-motion, step counter, gestures), the
+auxiliary and OIS interfaces, self-test, offsets and NVM. `bmi270_reg_read()`
+and `_reg_write()` reach them; the feature engine is what the configuration
+file runs.
+
 ## WT901C-TTL
 
 WitMotion's "WT901 Attitude Angle Sensor SPECIFICATION", in `docs/WT901.pdf`

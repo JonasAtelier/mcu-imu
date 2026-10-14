@@ -10,7 +10,7 @@ Paths mentioned in this guide are relative to the repository root.
 include/                    public API, the only directory apps include
   imu.h                     struct imu_dev, imu_read(), imu_time_us()
   imu_log.h                 imu_err/warn/info/dbg, imu_log_sample()
-  mpu6050.h icm45686.h bmi088.h wt901.h
+  mpu6050.h icm45686.h bmi088.h wt901.h bmi270.h icm42688.h
                             one header per chip: probe, remove, extras
 src/                        private to the library
   imu.c                     the core: timestamp, ops.read, mount rotation
@@ -22,20 +22,26 @@ src/                        private to the library
   icm45686/                 icm45686.c  icm45686_regs.h  icm45686_math.h  icm45686_priv.h
   bmi088/                   bmi088.c  bmi088_bus.c  bmi088_regs.h  bmi088_priv.h
   wt901/                    wt901.c     wt901_proto.h
+  icm42688/                 icm42688.c  icm42688_regs.h  icm42688_math.h  icm42688_priv.h
+  bmi270/                   bmi270.c  bmi270_regs.h  bmi270_math.h  bmi270_priv.h
+                            bmi270_config_file.c: Bosch's configuration file (BSD-3-Clause, see NOTICE)
 test/                       host tests, `make -C test test`
   test_<chip>_math.c        maths tests: no bus and no platform API
   wt901_cases.h             WT901 cases, shared by esp/ and stm/
+  bmi270_cases.h            a fake BMI270 and its cases, shared by esp/ and stm/, each run on I2C and SPI
+  icm42688_cases.h          a fake ICM-42688-P with its register banks, the same way
   esp/                      suites on idf_stubs/, through imu_port_esp.c
   stm/                      suites on hal_stubs/, through imu_port_stm.c
   idf_stubs/  hal_stubs/    the slice of ESP-IDF and of the HAL the code calls
 examples/
-  esp/<chip-or-board>/      ESP-IDF projects: bmi088, bmi088_spi, icm45686, mpu6050
-  stm/<chip-or-board>/      STM32 snippets: bmi088, bmi088_spi, icm45686, mpu6050
+  esp/<chip-or-board>/      ESP-IDF projects: bmi088, bmi088_spi, bmi270, icm42688, icm45686, mpu6050
+  stm/<chip-or-board>/      STM32 snippets: bmi088, bmi088_spi, bmi270, icm42688, icm45686, mpu6050
 docs/                       the five guides; datasheet PDFs here are gitignored
 assets/                     README and chip-reference figures
 CMakeLists.txt              ESP-IDF only; stm-forge globs src/**/*.c instead
 Kconfig                     IMU and IMU_<CHIP>, for ESP-IDF and both forges' menus
 idf_component.yml           ESP-IDF component manifest
+NOTICE                      third-party notices: Bosch's BMI270 configuration file
 ```
 
 Naming inside `src/<chip>/`, the same in every category library:
@@ -50,6 +56,10 @@ Naming inside `src/<chip>/`, the same in every category library:
 
 A chip has `_regs.h` or `_proto.h`, never both; `_math.h` and `_priv.h` only
 when it needs them. Everything in `src/` is private: apps see `include/` only.
+`bmi270_config_file.c` is the one file not written here: Bosch's array,
+copied byte for byte, renamed `bmi270_config_data` so it does not clash with
+Bosch's own API in the same app, its origin, SHA-256 and licence in its
+header.
 
 ## Platform ports
 
@@ -150,6 +160,10 @@ chip through ESP-IDF's calls instead (`i2c_master_*`, `spi_device_*`,
 | `test_wt901_math` | one accelerometer frame worked by hand, SUM included; any changed byte, or an unknown type even with its SUM made to match, rejected; low-byte-first signed values; the §6.1.2-6.1.4 full scales |
 | `{esp,stm}/test_wt901` | one fake module in `test/wt901_cases.h`, run through both ports by a little glue each: probe writes nothing; silence `-ENXIO`, bad SUMs only `-EBADMSG`, no gyroscope frames `-ENODATA`, a stream that stops `-ETIMEDOUT`, none of them allocating; scales and temperature; stale input dropped; frames in any order with other types between; a read starting mid-frame; noise full of 0x55s; a bad-SUM frame skipped; angles; command bytes; `-EBUSY` and foreign devices refused |
 | `{esp,stm}/test_bmi088` | the HAL transport against fake dies: the accelerometer's SPI dummy byte, its switch to SPI on a chip-select rising edge (at power-on and again after soft reset), errno mapping, a failed probe leaks nothing, no 0 ms delays, bad bus configs refused |
+| `test_icm42688_math` | Tables 1 and 2 and 14.37-14.38: every full scale and sensitivity as printed, the rate codes with the low-power-only ones refused; 14.6's temperature; the UI filter codes; anti-alias rows typed in by hand from 5.3, both ends and the rows where DELTSQR is not DELT squared, every row rising and fitting its register |
+| `{esp,stm}/test_icm42688` | one fake ICM-42688-P in `test/icm42688_cases.h`, each case on I2C and on SPI: **banks 0, 1, 2 and 4 kept apart, so a register written in the wrong bank is caught**, bank 0 again after every banked access; nothing heard for 1 ms after the soft reset; **a write other than rate, scale or power mode while a sensor runs (12.9), or any write within 200 us of a sensor coming on, counted and failed**; the 12.3 I2C settings on I2C only; the anti-alias rows 1, 13, 20, 24, 40 and 63 in the right registers with reserved bits kept, bypass alone; UI filter order and bandwidth; the interrupt both ways with `INT_ASYNC_RESET` cleared, the latched pin released by a sample read; the big-endian burst and temperature; rate, scale and power changes after probe; the bank escape hatch; refused codes before any allocation or traffic; a bus error at every transfer of a full probe ends it with nothing bound or leaked |
+| `test_bmi270_math` | Tables 2 to 4: every range's sensitivity, the rate codes and which are valid, temperature at 23 °C, both ends and the invalid code; `GYR_CAS` sign extension, the cross-axis correction with its integer division and 16-bit limit |
+| `{esp,stm}/test_bmi270` | one fake BMI270 in `test/bmi270_cases.h`, each case on I2C and on SPI: the interface I2C after power-up and every soft reset until a CSB edge and 200 us; the SPI dummy byte; a write lost if it comes before the idle time of the power mode it follows (450 us, 2 us); the upload only to a prepared chip, at its `INIT_ADDR`, **byte for byte equal to Bosch's file** (274 pieces, none over 30 bytes), `INIT_CTRL` = 1 once per reset; `-EPROTO` for a reported load error or one corrupted byte, `-ETIMEDOUT` no earlier than 20 ms, `-ENODEV` with nothing written; a bus error at every 37th transfer and the last one ends the probe with nothing bound or leaked; every register of a full config and of the interrupt both ways; the burst, cross-axis correction, NaN temperature, `INT_STATUS_1` cleared; rate and range changes keeping the filter bits; refused configs before any allocation or bus traffic. Per platform: the address, clock and SPI mode passed or refused, `-ENXIO` before allocation, the HAL's status as errno |
 
 All build under `-std=gnu11 -Wall -Wextra -Werror -pedantic`, with
 `-Wl,--wrap` (GNU ld) to count allocations and capture `printf()`.

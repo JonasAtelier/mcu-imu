@@ -13,7 +13,7 @@
 </p>
 
 A small C IMU library for **ESP-IDF 5.2+** and **STM32 HAL (F4/F7)**.
-Four chip drivers share one API for timestamped samples of acceleration in
+Six chip drivers share one API for timestamped samples of acceleration in
 m/s², angular rate in rad/s and die temperature in °C, with board-axis
 mapping. This library replaces `esp-imu` and `stm-imu`.
 
@@ -30,7 +30,7 @@ component directory named `imu` as well.
 
 ## Supported hardware
 
-All four drivers support both platforms. Enable only the drivers you need.
+All six drivers support both platforms. Enable only the drivers you need.
 
 | Chip | Bus | Notes |
 |---|---|---|
@@ -38,6 +38,8 @@ All four drivers support both platforms. Enable only the drivers you need.
 | **ICM-45686** | SPI | SPI only in this driver, mode 3; full-scale codes run backwards |
 | **BMI088** | I2C or SPI | Two dies, each with its own address or chip select; on STM32 both HAL modules are needed |
 | **WT901C-TTL** | UART | Serial only; the module streams frames, each checked by its SUM |
+| **ICM-42688-P** | I2C or SPI | Register banks; anti-alias and UI filters set at probe; data ready on INT1 if asked; on STM32 one HAL module per probe |
+| **BMI270** | I2C or SPI | Bosch's 8 KB configuration file uploaded at every probe; data ready on INT1 if asked; on STM32 one HAL module per probe |
 
 Wiring for every chip is in the [wiring guide](docs/hardware.md); the
 WT901's serial protocol is in the [chip reference](docs/chips.md#wt901c-ttl).
@@ -158,6 +160,8 @@ axis mapping, logging, and error codes.
 | BMI088 over I2C | [bmi088](examples/esp/bmi088/) | [bmi088](examples/stm/bmi088/main.c) |
 | BMI088 over SPI | [bmi088_spi](examples/esp/bmi088_spi/) | [bmi088_spi](examples/stm/bmi088_spi/main.c) |
 | WT901C-TTL | — | — |
+| ICM-42688-P | [icm42688](examples/esp/icm42688/), on SPI | [icm42688](examples/stm/icm42688/main.c), on I2C with INT1 |
+| BMI270 | [bmi270](examples/esp/bmi270/), on I2C | [bmi270](examples/stm/bmi270/main.c), on SPI with INT1 |
 
 ESP-IDF examples already locate this library through `EXTRA_COMPONENT_DIRS`.
 With ESP-IDF activated, build from an example directory:
@@ -179,7 +183,9 @@ The library provides a shared sample format and synchronous chip drivers.
 Your application owns bus setup, scheduling, and locking.
 
 - **Calibration:** bias and scale correction belong above `imu_read()`.
-- **Blocking bus calls:** no FIFO, interrupts, DMA, DMP/APEX or self-test.
+- **Blocking bus calls:** no FIFO, DMA, DMP/APEX or self-test, and no
+  driver waits on an interrupt; the ICM-42688-P and the BMI270 can only
+  route data ready to their INT1 pin for the app to wait on.
   The register chips poll a status register over the bus, and on the
   MPU-6050 and ICM-45686 the raw register calls reach the rest; the WT901
   waits for its own stream.

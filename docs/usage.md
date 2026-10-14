@@ -110,7 +110,8 @@ NACKs its address is `HAL_ERROR` there, `-ENXIO`, on the F4 and the F7. On the
 F4, a bus with no pull-ups or SDA stuck low sets the peripheral's BUSY flag,
 so the probe gives up after 25 ms with `-EAGAIN`; `-ETIMEDOUT` means a START
 never completed. Check the wiring for either. SPI has no
-ACK, so an absent SPI chip (ICM-45686, BMI088 over SPI) reads back a wrong ID
+ACK, so an absent SPI chip (ICM-45686, ICM-42688-P, BMI088 or BMI270 over
+SPI) reads back a wrong ID
 and is `-ENODEV`. `-EBUSY` from a probe means that `imu_dev` is already bound.
 On ESP-IDF bus failures map from `esp_err_t`: `ESP_ERR_TIMEOUT` is
 `-ETIMEDOUT`, `ESP_ERR_INVALID_ARG` `-EINVAL`, `ESP_ERR_INVALID_SIZE`
@@ -124,7 +125,11 @@ is `-EIO` — including a NACK in the middle of a transfer. `-EINVAL` and
 driver's idea of the scale matching whatever the chip actually took, so
 `imu_read()` stays correct even if only half of it landed. The BMI088 also
 returns `-ERANGE` for an invalid temperature code, which fails that whole
-`imu_read()`.
+`imu_read()`; the BMI270 instead reads that code as a NaN temperature and
+keeps the rest of the sample. A BMI270 probe adds `-ETIMEDOUT` (the
+configuration file never reports loaded within the datasheet's 20 ms) and
+`-EPROTO` (the chip reports the load failed); see the
+[chip reference](chips.md#bmi270).
 The WT901 adds `-EBADMSG` (bytes arrive, but no frame's SUM ever matches)
 and `-ENODATA` (valid frames, but not the ones asked for); see the
 [chip reference](chips.md#wt901c-ttl).
