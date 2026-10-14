@@ -120,6 +120,10 @@ struct imu_bus {
     CONFIG_IMU_BMI270
 #error "IMU_BMI270 needs the HAL I2C or SPI module, for bmi270_probe_i2c() or bmi270_probe_spi(): #define HAL_I2C_MODULE_ENABLED or HAL_SPI_MODULE_ENABLED in the app's stm32f{4,7}xx_hal_conf.h, with stm32f{4,7}xx_hal_i2c.c or _spi.c in the build"
 #endif
+#if !defined(HAL_I2C_MODULE_ENABLED) && !defined(HAL_SPI_MODULE_ENABLED) && \
+    CONFIG_IMU_ICM42688
+#error "IMU_ICM42688 needs the HAL I2C or SPI module, for icm42688_probe_i2c() or icm42688_probe_spi(): #define HAL_I2C_MODULE_ENABLED or HAL_SPI_MODULE_ENABLED in the app's stm32f{4,7}xx_hal_conf.h, with stm32f{4,7}xx_hal_i2c.c or _spi.c in the build"
+#endif
 
 #ifdef HAL_I2C_MODULE_ENABLED
 typedef I2C_HandleTypeDef *imu_i2c_bus;

@@ -14,7 +14,7 @@ set(srcs "src/imu.c" "src/imu_log.c" "src/imu_port_esp.c")
 
 if(CONFIG_IMU AND NOT (CONFIG_IMU_MPU6050 OR CONFIG_IMU_ICM45686 OR
                        CONFIG_IMU_BMI088 OR CONFIG_IMU_WT901 OR
-                       CONFIG_IMU_BMI270))
+                       CONFIG_IMU_BMI270 OR CONFIG_IMU_ICM42688))
     message(WARNING "imu: CONFIG_IMU is on but no chip driver is "
                     "selected; set CONFIG_IMU_<CHIP>=y "
                     "(esp-forge: IMU_<CHIP> = y)")
@@ -31,6 +31,9 @@ if(CONFIG_IMU_BMI088)
 endif()
 if(CONFIG_IMU_WT901)
     list(APPEND srcs "src/wt901/wt901.c")
+endif()
+if(CONFIG_IMU_ICM42688)
+    list(APPEND srcs "src/icm42688/icm42688.c")
 endif()
 if(CONFIG_IMU_BMI270)
     list(APPEND srcs "src/bmi270/bmi270.c" "src/bmi270/bmi270_config_file.c")

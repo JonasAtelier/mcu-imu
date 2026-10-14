@@ -40,6 +40,15 @@ if IMU
             module's frame stream on a UART the app has set up. On the
             STM32 HAL it needs the UART module.
 
+    config IMU_ICM42688
+        bool "TDK InvenSense ICM-42688-P (I2C or SPI)"
+        default n
+        help
+            Build the ICM-42688-P driver: icm42688_probe_i2c(),
+            icm42688_probe_spi() and friends. On the STM32 HAL each probe
+            is built with its own module, I2C or SPI; one of them is
+            needed.
+
     config IMU_BMI270
         bool "Bosch BMI270 (I2C or SPI)"
         default n
