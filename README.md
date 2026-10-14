@@ -227,4 +227,7 @@ expected: tests deliberately exercise failure paths.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The BMI270 driver carries Bosch Sensortec's configuration
+file for the chip under the BSD 3-Clause licence; [NOTICE](NOTICE) has its
+origin and Bosch's notice, which a firmware built with `IMU_BMI270` must ship
+with.
