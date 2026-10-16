@@ -20,7 +20,7 @@ extern "C" {
 struct imu_sample {
 	float accel[3];		/* m/s^2 */
 	float gyro[3];		/* rad/s */
-	float temp_c;
+	float temp_c;		/* NaN if the chip marks it invalid */
 	int64_t t_us;		/* imu_time_us() at read */
 };
 

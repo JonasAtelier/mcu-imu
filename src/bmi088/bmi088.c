@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <math.h>
 
 #include "imu_priv.h"
 
@@ -477,9 +478,15 @@ int bmi088_read_temperature(struct imu_dev *imu, float *temperature_c)
 	if (ret)
 		return ret;
 
-	/* This reserved code marks invalid temperature data. */
-	if (data[0] == 0x80 && data[1] == 0x00)
-		return -ERANGE;
+	/*
+	 * This reserved code marks invalid temperature data: NaN, as the
+	 * BMI270 does, so imu_read() keeps the rest of the sample.
+	 * TODO: cite BMI088 datasheet section once docs/bmi088.pdf is added
+	 */
+	if (data[0] == 0x80 && data[1] == 0x00) {
+		*temperature_c = NAN;
+		return 0;
+	}
 
 	unsigned_value = ((uint16_t)data[0] << 3) | (data[1] >> 5);
 	signed_value = unsigned_value > 1023 ?

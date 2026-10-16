@@ -8,7 +8,7 @@
  * Samples come out of imu_read(). Note that one sample is three transfers --
  * accelerometer, gyroscope, temperature -- so its halves are not from the
  * same instant the way a single-die part's are. An invalid temperature code
- * fails the whole read with -ERANGE.
+ * reads as NaN, and the rest of the sample stands.
  *
  * Everything below that is BMI088 specific takes the struct imu_dev a probe
  * filled, and returns -EINVAL if handed a device some other driver probed.
@@ -198,7 +198,7 @@ int bmi088_read_accel_raw(struct imu_dev *imu, struct bmi088_vec3_raw *accel);
 int bmi088_read_gyro_raw(struct imu_dev *imu, struct bmi088_vec3_raw *gyro);
 int bmi088_read_accel(struct imu_dev *imu, struct bmi088_vec3 *accel_mps2);
 int bmi088_read_gyro(struct imu_dev *imu, struct bmi088_vec3 *gyro_rads);
-/* -ERANGE for the reserved invalid code or an out-of-range value. */
+/* NaN for the reserved invalid code; -ERANGE for an out-of-range value. */
 int bmi088_read_temperature(struct imu_dev *imu, float *temperature_c);
 
 /* BMI088_DATA_READY_ACCEL | BMI088_DATA_READY_GYRO, as each die reports. */

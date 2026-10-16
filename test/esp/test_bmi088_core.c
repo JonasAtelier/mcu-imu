@@ -210,9 +210,8 @@ static void test_temperature(void)
 
 	bus.accel[0x22] = 0x80;
 	bus.accel[0x23] = 0x00;
-	temperature = 99.0f;
-	EXPECT_EQ(bmi088_read_temperature(&imu, &temperature), -ERANGE);
-	EXPECT_TRUE(temperature == 99.0f);
+	EXPECT_EQ(bmi088_read_temperature(&imu, &temperature), 0);
+	EXPECT_TRUE(isnan(temperature));
 }
 
 static void test_errors_do_not_change_output(void)
@@ -276,10 +275,12 @@ static void test_imu_read(void)
 	EXPECT_TRUE(fabsf(s.gyro[1] + 34.9066f) < 0.001f);
 	EXPECT_TRUE(fabsf(s.temp_c - 23.375f) < 0.001f);
 
-	/* An invalid temperature fails the whole sample, as it always has. */
+	/* An invalid temperature is NaN; the rest of the sample stands. */
 	bus.accel[0x22] = 0x80;
 	bus.accel[0x23] = 0x00;
-	EXPECT_EQ(imu_read(&imu, &s), -ERANGE);
+	EXPECT_EQ(imu_read(&imu, &s), 0);
+	EXPECT_TRUE(isnan(s.temp_c));
+	EXPECT_TRUE(fabsf(s.accel[0] - 8.3672f) < 0.001f);
 
 	/* Before init completes there is nothing to read. */
 	dev.initialized = 0;
