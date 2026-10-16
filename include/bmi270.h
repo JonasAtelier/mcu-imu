@@ -14,8 +14,7 @@
  * burst also reads, and so clears, the EVENT and INT_STATUS_0/1 registers:
  * with a latched data-ready interrupt, reading the sample releases the pin.
  * A temperature the chip marks invalid (0x8000) reads as NaN, and the rest
- * of the sample stands; the BMI088 driver fails the whole read with -ERANGE
- * instead.
+ * of the sample stands, as on the BMI088.
  *
  * Everything below that is BMI270 specific takes the struct imu_dev a probe
  * filled, and returns -EINVAL if handed a device some other driver probed.

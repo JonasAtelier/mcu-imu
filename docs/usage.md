@@ -123,10 +123,9 @@ bound" — and `HAL_ERROR`
 is `-EIO` — including a NACK in the middle of a transfer. `-EINVAL` and
 `-ENOMEM` mean what they say. A failed range or rate change leaves the
 driver's idea of the scale matching whatever the chip actually took, so
-`imu_read()` stays correct even if only half of it landed. The BMI088 also
-returns `-ERANGE` for an invalid temperature code, which fails that whole
-`imu_read()`; the BMI270 instead reads that code as a NaN temperature and
-keeps the rest of the sample. A BMI270 probe adds `-ETIMEDOUT` (the
+`imu_read()` stays correct even if only half of it landed. The BMI088 and
+the BMI270 read an invalid temperature code as a NaN temperature and keep
+the rest of the sample. A BMI270 probe adds `-ETIMEDOUT` (the
 configuration file never reports loaded within the datasheet's 20 ms) and
 `-EPROTO` (the chip reports the load failed); see the
 [chip reference](chips.md#bmi270).

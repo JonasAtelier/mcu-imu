@@ -268,7 +268,7 @@ ready bits also does not make their samples simultaneous.
 | `bmi088_read_accel(&imu, &v)` | m/s², chip frame |
 | `bmi088_read_gyro(&imu, &v)` | rad/s, chip frame |
 | `bmi088_read_accel_raw` / `_gyro_raw` | Counts |
-| `bmi088_read_temperature(&imu, &t)` | °C; `-ERANGE` for the invalid code |
+| `bmi088_read_temperature(&imu, &t)` | °C; NaN for the invalid code |
 | `bmi088_data_ready(&imu, &mask)` | `BMI088_DATA_READY_ACCEL` / `_GYRO` bits; poll before reading |
 | `bmi088_default_config()` | Starting config to modify |
 
@@ -514,9 +514,9 @@ latched data-ready interrupt, reading the sample is what releases the pin.
 **Temperature** is 23 °C at 0 and 1/512 K per LSB (Table 4, 4.6.14). The
 code `0x8000` means invalid (5.2.34); the word is valid only while the
 gyroscope is in normal mode (same section). `imu_read()` then gives NaN for
-`temp_c` and still returns the rest -- unlike the BMI088, whose driver fails
-the whole `imu_read()` with `-ERANGE` for its invalid code. Losing a whole
-motion sample over the temperature would be the worse trade.
+`temp_c` and still returns the rest, as the BMI088 driver does for its
+invalid code. Losing a whole motion sample over the temperature would be the
+worse trade.
 
 **Gyroscope X** is corrected for its cross-axis sensitivity to Z, as the
 datasheet requires: x − factor_zx · z / 2⁹ (4.6.10), with factor_zx the
