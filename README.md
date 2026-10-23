@@ -24,7 +24,8 @@ component directory named `imu` as well.
 > **Hardware unverified.** Host tests use simulated devices and platform stubs.
 > Nothing here has run on a physical chip.
 
-[Supported hardware](#supported-hardware) · [Install](#install) ·
+[Supported hardware](#supported-hardware) · [Drivers](#drivers) ·
+[Install](#install) ·
 [Quick start](#quick-start) · [Examples](#examples) ·
 [Documentation](#documentation) · [Tests](#tests)
 
@@ -34,17 +35,106 @@ All seven drivers support both platforms. Enable only the drivers you need.
 
 | Chip | Bus | Notes |
 |---|---|---|
-| **MPU-6050** | I2C | Address `0x68` or `0x69` by AD0; found on GY-521 boards |
-| **ICM-45686** | SPI | SPI only in this driver, mode 3; full-scale codes run backwards |
-| **BMI088** | I2C or SPI | Two dies, each with its own address or chip select; on STM32 both HAL modules are needed |
-| **WT901C-TTL** | UART | Serial only; the module streams frames, each checked by its SUM |
-| **ICM-42688-P** | I2C or SPI | Register banks; anti-alias and UI filters set at probe; data ready on INT1 if asked; on STM32 one HAL module per probe |
-| **BMI270** | I2C or SPI | Bosch's 8 KB configuration file uploaded at every probe; data ready on INT1 if asked; on STM32 one HAL module per probe |
-| **JY901** | UART or I2C | WitMotion module, its own driver: the WT901's frame stream on the UART, one register burst on I2C at `0x50`; on STM32 one HAL module per probe |
+| **MPU-6050** | I2C | InvenSense 6-axis IMU |
+| **ICM-45686** | SPI | TDK InvenSense 6-axis IMU |
+| **BMI088** | I2C or SPI | Bosch 6-axis IMU on two dies |
+| **WT901C-TTL** | UART | WitMotion attitude module |
+| **ICM-42688-P** | I2C or SPI | TDK InvenSense 6-axis IMU |
+| **BMI270** | I2C or SPI | Bosch 6-axis IMU |
+| **JY901** | UART or I2C | WitMotion attitude module |
 
-Wiring for every chip is in the [wiring guide](docs/hardware.md); the
-WT901's serial protocol is in the [chip reference](docs/chips.md#wt901c-ttl),
-the JY901's two buses [there too](docs/chips.md#jy901).
+Wiring for every chip is in the [wiring guide](docs/hardware.md); each
+driver's own notes, examples and limits are under [Drivers](#drivers).
+
+## Drivers
+
+<details><summary><b>MPU-6050</b> — I2C</summary>
+
+Address `0x68` or `0x69` by AD0; found on GY-521 boards.
+
+- Examples: ESP-IDF [mpu6050](examples/esp/mpu6050/) · STM32 HAL
+  [mpu6050](examples/stm/mpu6050/main.c)
+- Chip reference: [MPU-6050](docs/chips.md#mpu-6050)
+
+</details>
+
+<details><summary><b>ICM-45686</b> — SPI</summary>
+
+SPI only in this driver, mode 3; full-scale codes run backwards.
+
+- Examples: ESP-IDF [icm45686](examples/esp/icm45686/) · STM32 HAL
+  [icm45686](examples/stm/icm45686/main.c)
+- Chip reference: [ICM-45686](docs/chips.md#icm-45686)
+
+</details>
+
+<details><summary><b>BMI088</b> — I2C or SPI</summary>
+
+Two dies, each with its own address or chip select; on STM32 both HAL modules
+are needed.
+
+- Examples over I2C: ESP-IDF [bmi088](examples/esp/bmi088/) · STM32 HAL
+  [bmi088](examples/stm/bmi088/main.c)
+- Examples over SPI: ESP-IDF [bmi088_spi](examples/esp/bmi088_spi/) ·
+  STM32 HAL [bmi088_spi](examples/stm/bmi088_spi/main.c)
+- **Not one instant:** accelerometer, gyroscope and temperature are three
+  transfers on two dies.
+- Chip reference: [BMI088](docs/chips.md#bmi088)
+
+</details>
+
+<details><summary><b>WT901C-TTL</b> — UART</summary>
+
+Serial only; the module streams frames, each checked by its SUM.
+
+- Examples: none.
+- **WT901 rate:** `imu_read()` blocks up to one output period plus two
+  frames, about 125 ms at the defaults; the effective sample rate never
+  exceeds the module's output rate, and a faster loop blocks.
+- **Not one instant:** accelerometer and gyroscope are two consecutive
+  frames.
+- Chip reference, with the serial protocol:
+  [WT901C-TTL](docs/chips.md#wt901c-ttl)
+
+</details>
+
+<details><summary><b>ICM-42688-P</b> — I2C or SPI</summary>
+
+Register banks; anti-alias and UI filters set at probe; data ready on INT1 if
+asked; on STM32 one HAL module per probe.
+
+- Examples: ESP-IDF [icm42688](examples/esp/icm42688/), on SPI · STM32 HAL
+  [icm42688](examples/stm/icm42688/main.c), on I2C with INT1
+- Chip reference: [ICM-42688-P](docs/chips.md#icm-42688-p)
+
+</details>
+
+<details><summary><b>BMI270</b> — I2C or SPI</summary>
+
+Bosch's 8 KB configuration file uploaded at every probe; data ready on INT1
+if asked; on STM32 one HAL module per probe.
+
+- Examples: ESP-IDF [bmi270](examples/esp/bmi270/), on I2C · STM32 HAL
+  [bmi270](examples/stm/bmi270/main.c), on SPI with INT1
+- Chip reference: [BMI270](docs/chips.md#bmi270)
+
+</details>
+
+<details><summary><b>JY901</b> — UART or I2C</summary>
+
+WitMotion module, its own driver: the WT901's frame stream on the UART, one
+register burst on I2C at `0x50`; on STM32 one HAL module per probe.
+
+- Examples: ESP-IDF [jy901](examples/esp/jy901/), on the UART · STM32 HAL
+  [jy901](examples/stm/jy901/main.c), on I2C
+- **Serial rate:** on its UART, `imu_read()` blocks up to one output period
+  plus two frames, about 125 ms at the defaults; the effective sample rate
+  never exceeds the module's output rate, and a faster loop blocks.
+- **Not one instant:** on its UART, accelerometer and gyroscope are two
+  consecutive frames.
+- Chip reference, with both buses: [JY901](docs/chips.md#jy901)
+
+</details>
 
 ## Install
 
@@ -155,16 +245,7 @@ axis mapping, logging, and error codes.
 
 ## Examples
 
-| Sensor / task | ESP-IDF | STM32 HAL |
-|---|---|---|
-| MPU-6050 | [mpu6050](examples/esp/mpu6050/) | [mpu6050](examples/stm/mpu6050/main.c) |
-| ICM-45686 | [icm45686](examples/esp/icm45686/) | [icm45686](examples/stm/icm45686/main.c) |
-| BMI088 over I2C | [bmi088](examples/esp/bmi088/) | [bmi088](examples/stm/bmi088/main.c) |
-| BMI088 over SPI | [bmi088_spi](examples/esp/bmi088_spi/) | [bmi088_spi](examples/stm/bmi088_spi/main.c) |
-| WT901C-TTL | — | — |
-| ICM-42688-P | [icm42688](examples/esp/icm42688/), on SPI | [icm42688](examples/stm/icm42688/main.c), on I2C with INT1 |
-| BMI270 | [bmi270](examples/esp/bmi270/), on I2C | [bmi270](examples/stm/bmi270/main.c), on SPI with INT1 |
-| JY901 | [jy901](examples/esp/jy901/), on the UART | [jy901](examples/stm/jy901/main.c), on I2C |
+Each driver's examples are listed under [Drivers](#drivers).
 
 ESP-IDF examples already locate this library through `EXTRA_COMPONENT_DIRS`.
 With ESP-IDF activated, build from an example directory:
@@ -192,16 +273,10 @@ Your application owns bus setup, scheduling, and locking.
   The register chips poll a status register over the bus, and on the
   MPU-6050 and ICM-45686 the raw register calls reach the rest; the WT901,
   and the JY901 on its UART, wait for their own stream.
-- **WT901 and JY901 serial rate:** `imu_read()` blocks up to one output
-  period plus two frames, about 125 ms at the defaults; the effective sample rate never
-  exceeds the module's output rate, and a faster loop blocks.
 - **No unified range or rate API:** the steps do not line up — the BMI088's
   accelerometer runs 3/6/12/24 g, the MPU-6050 and ICM-45686 2 g upwards, and
   the rate
   schemes differ — so a common one would have to round.
-- **Not one instant:** the BMI088's accelerometer, gyroscope and temperature
-  are three transfers on two dies; the WT901's, and the JY901's on its UART,
-  are two consecutive frames.
 - **Concurrency:** use one thread per device and bus handle, or supply a mutex.
   The HAL's own lock answers a clash with `HAL_BUSY`, which comes back as
   `-EAGAIN`.
