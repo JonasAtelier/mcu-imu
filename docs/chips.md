@@ -591,3 +591,67 @@ slow the module down.
   the low 8 bits are compared.
 - §6.1.4 is titled "Angular Velocity Output" but is the angle frame.
 - The PDF gives no order for the frames in a cycle, so none is assumed.
+- §5.5 (p.18) says the default baud rate is 115200; §2 item 11 (p.5),
+  §5.6 (p.18), §6.2 reminder 1 (p.35) and chapter 6 say 9600. The driver
+  and the examples assume 9600.
+
+## JY901
+
+WitMotion's JY901 module, as its own driver, `src/jy901/`. No JY901 manual
+was found or fetched; the document is the same `docs/WT901.pdf` (not
+committed), which names the module JY-901 itself in its IIC sections (§5.2,
+p.26; chapter 7, p.46-49). Every byte, register and scale in
+`src/jy901/jy901_regs.h` and `src/jy901/jy901.c` cites its section and page.
+Both buses are supported, one probe each: `jy901_probe_uart()` and
+`jy901_probe_i2c()`. On STM32 each is built with its own HAL module, UART or
+I2C; one is enough.
+
+**One address space.** The register table of §6.2.1 (p.35-36) and of
+chapter 7 (p.46-48) is the same. On the UART those addresses are written by
+the 0xFF 0xAA address dataL dataH command (§6.2); on I2C they are read and
+written as 16-bit registers, low byte first, running on to the next
+register (§7.1 p.48, §7.2 p.49). So `jy901_command(address, value)` is the
+same call on both buses. That is why the folder has `jy901_regs.h`, not
+`_proto.h`: the frame stream is in it too.
+
+**On the UART** the driver is the WT901's, with its own copy of the frame
+scanner: the probe writes nothing and waits for one 0x51 and one 0x52 frame;
+`imu_read()` drops stale input and takes the next pair in either order;
+`jy901_read_angles()` takes the next 0x53. Errors are the WT901's:
+`-ENXIO` for silence, `-EBADMSG` when no SUM matches, `-ENODATA` when 0x51
+or 0x52 output is off, `-ETIMEDOUT` when the stream stops. See
+[WT901C-TTL](#wt901c-ttl) for the scanner and the SUM.
+
+**On I2C**, at `0x50` by default, any 7-bit address up to `0x7f` (§6.2.32,
+p.45), at most 400 kHz (§1, §2 item 11, chapter 7); ESP-IDF defaults to
+400 kHz and refuses more, the HAL handle sets its own. Fit 4.7 k pull-ups:
+the module's bus is open drain (§5.2). The probe writes nothing. After the
+ACK check (`-ENXIO`), it reads `IICADDR` (0x1a) and requires the address in
+the low byte and zero in the high one, as §6.2.32 writes it; anything else
+is **`-ENODEV`**, so an EEPROM or another part at 0x50 is not taken for the
+module. Then one burst. `imu_read()` is one read of AX through TEMP,
+0x34-0x40, 26 bytes, so accelerometer, gyroscope and temperature are from
+one moment, unlike the UART's two frames. `jy901_read_angles()` reads Roll,
+Pitch and Yaw from 0x3d, §7.2's own example.
+
+**Scales** are the frames' (§6.1.2-6.1.4): ×16/32768 g with this library's
+`IMU_G`, ×2000/32768 °/s, ×180/32768 °, temperature /100 °C.
+
+**Gaps in the PDF**, filled with a stated assumption:
+
+- The document is for the WT901; the JY901 is taken to be the same module
+  and protocol, because the document calls it JY-901 where it describes I2C.
+  No JY901-specific manual was checked.
+- Chapter 7 gives no scale for the registers. §7.2 converts the angle
+  registers with the frame formula (citing "section 5.1.4", which is 6.1.4),
+  so every register is taken to use its frame's scale, TEMP included.
+- Chapter 7 never shows a configuration register being read. The probe
+  assumes `IICADDR` reads back the address, as §6.2.32 writes it. If a real
+  module fails the probe with `-ENODEV` while answering at its address, this
+  assumption is the first suspect.
+- The PDF gives no update rate for the registers on I2C; the stream's rate
+  (§6.2.9) is assumed to apply. Reading faster may return the same values.
+- The SUM and §6.1.4's title, as for the [WT901C-TTL](#wt901c-ttl).
+- §5.5 (p.18) says the default baud rate is 115200; §2 item 11 (p.5),
+  §5.6 (p.18), §6.2 reminder 1 (p.35) and chapter 6 say 9600. The driver
+  and the examples assume 9600.

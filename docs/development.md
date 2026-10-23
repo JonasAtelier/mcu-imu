@@ -10,7 +10,7 @@ Paths mentioned in this guide are relative to the repository root.
 include/                    public API, the only directory apps include
   imu.h                     struct imu_dev, imu_read(), imu_time_us()
   imu_log.h                 imu_err/warn/info/dbg, imu_log_sample()
-  mpu6050.h icm45686.h bmi088.h wt901.h bmi270.h icm42688.h
+  mpu6050.h icm45686.h bmi088.h wt901.h bmi270.h icm42688.h jy901.h
                             one header per chip: probe, remove, extras
 src/                        private to the library
   imu.c                     the core: timestamp, ops.read, mount rotation
@@ -22,20 +22,22 @@ src/                        private to the library
   icm45686/                 icm45686.c  icm45686_regs.h  icm45686_math.h  icm45686_priv.h
   bmi088/                   bmi088.c  bmi088_bus.c  bmi088_regs.h  bmi088_priv.h
   wt901/                    wt901.c     wt901_proto.h
+  jy901/                    jy901.c     jy901_regs.h: registers and the WT901-style frames, one address space
   icm42688/                 icm42688.c  icm42688_regs.h  icm42688_math.h  icm42688_priv.h
   bmi270/                   bmi270.c  bmi270_regs.h  bmi270_math.h  bmi270_priv.h
                             bmi270_config_file.c: Bosch's configuration file (BSD-3-Clause, see NOTICE)
 test/                       host tests, `make -C test test`
   test_<chip>_math.c        maths tests: no bus and no platform API
   wt901_cases.h             WT901 cases, shared by esp/ and stm/
+  jy901_cases.h             a fake JY901, its UART line and its I2C registers, shared by esp/ and stm/
   bmi270_cases.h            a fake BMI270 and its cases, shared by esp/ and stm/, each run on I2C and SPI
   icm42688_cases.h          a fake ICM-42688-P with its register banks, the same way
   esp/                      suites on idf_stubs/, through imu_port_esp.c
   stm/                      suites on hal_stubs/, through imu_port_stm.c
   idf_stubs/  hal_stubs/    the slice of ESP-IDF and of the HAL the code calls
 examples/
-  esp/<chip-or-board>/      ESP-IDF projects: bmi088, bmi088_spi, bmi270, icm42688, icm45686, mpu6050
-  stm/<chip-or-board>/      STM32 snippets: bmi088, bmi088_spi, bmi270, icm42688, icm45686, mpu6050
+  esp/<chip-or-board>/      ESP-IDF projects: bmi088, bmi088_spi, bmi270, icm42688, icm45686, jy901, mpu6050
+  stm/<chip-or-board>/      STM32 snippets: bmi088, bmi088_spi, bmi270, icm42688, icm45686, jy901, mpu6050
 docs/                       the five guides; datasheet PDFs here are gitignored
 assets/                     README and chip-reference figures
 CMakeLists.txt              ESP-IDF only; stm-forge globs src/**/*.c instead
@@ -159,6 +161,8 @@ chip through ESP-IDF's calls instead (`i2c_master_*`, `spi_device_*`,
 | `{esp,stm}/test_bmi088_core` | the chip half against a mock bus: write sequence and delays, scaling, temperature decode, NaN for the invalid code, outputs untouched on error, `imu_read()` in SI, an app's `imu_time_us()` replacing the weak default |
 | `test_wt901_math` | one accelerometer frame worked by hand, SUM included; any changed byte, or an unknown type even with its SUM made to match, rejected; low-byte-first signed values; the §6.1.2-6.1.4 full scales |
 | `{esp,stm}/test_wt901` | one fake module in `test/wt901_cases.h`, run through both ports by a little glue each: probe writes nothing; silence `-ENXIO`, bad SUMs only `-EBADMSG`, no gyroscope frames `-ENODATA`, a stream that stops `-ETIMEDOUT`, none of them allocating; scales and temperature; stale input dropped; frames in any order with other types between; a read starting mid-frame; noise full of 0x55s; a bad-SUM frame skipped; angles; command bytes; `-EBUSY` and foreign devices refused |
+| `test_jy901_math` | the WT901 frame checks again, on the JY901's own header; §7.2's worked read from 0x3d, -176.33°, -1.19°, 51.89°, as printed; the AX-to-TEMP burst layout and register addresses of chapter 7 |
+| `{esp,stm}/test_jy901` | one fake module in `test/jy901_cases.h` with a UART line and an I2C register file. UART: the WT901 cases (silence, bad SUMs, missing types, a stopped stream, stale input, any order, mid-frame start, noise, angles, command bytes). I2C: 0x50 by default, **`IICADDR` checked, a wrong value or high byte `-ENODEV`**, another address only when `IICADDR` holds it; nothing written at probe; a bus error at either probe transfer ends it with nothing allocated or added; **`imu_read()` one 26-byte read from 0x34**, with distinct values in the registers between so a wrong offset fails; a failed read leaves the sample alone; angles by §7.2's example; `jy901_command()` a two-byte register write; foreign devices refused. Per platform: the ESP-IDF clock, 400 kHz by default and no more; the HAL's `HAL_ERROR` as `-EIO` and `HAL_BUSY` as `-EAGAIN` |
 | `{esp,stm}/test_bmi088` | the HAL transport against fake dies: the accelerometer's SPI dummy byte, its switch to SPI on a chip-select rising edge (at power-on and again after soft reset), errno mapping, a failed probe leaks nothing, no 0 ms delays, bad bus configs refused |
 | `test_icm42688_math` | Tables 1 and 2 and 14.37-14.38: every full scale and sensitivity as printed, the rate codes with the low-power-only ones refused; 14.6's temperature; the UI filter codes; anti-alias rows typed in by hand from 5.3, both ends and the rows where DELTSQR is not DELT squared, every row rising and fitting its register |
 | `{esp,stm}/test_icm42688` | one fake ICM-42688-P in `test/icm42688_cases.h`, each case on I2C and on SPI: **banks 0, 1, 2 and 4 kept apart, so a register written in the wrong bank is caught**, bank 0 again after every banked access; nothing heard for 1 ms after the soft reset; **a write other than rate, scale or power mode while a sensor runs (12.9), or any write within 200 us of a sensor coming on, counted and failed**; the 12.3 I2C settings on I2C only; the anti-alias rows 1, 13, 20, 24, 40 and 63 in the right registers with reserved bits kept, bypass alone; UI filter order and bandwidth; the interrupt both ways with `INT_ASYNC_RESET` cleared, the latched pin released by a sample read; the big-endian burst and temperature; rate, scale and power changes after probe; the bank escape hatch; refused codes before any allocation or traffic; a bus error at every transfer of a full probe ends it with nothing bound or leaked |

@@ -19,7 +19,9 @@ imu: mpu6050: t 1234000 us  a   0.012  -0.034   9.801 m/s^2  g   0.001  -0.002  
 
 The other chips are the same after the probe:
 `icm45686_probe(&imu, &cfg)`, `bmi088_probe_i2c(&imu, &bus_cfg, NULL)`,
-`bmi088_probe_spi(...)` or `wt901_probe(&imu, uart, NULL)`. Tear down with
+`bmi088_probe_spi(...)`, `wt901_probe(&imu, uart, NULL)`,
+`jy901_probe_uart(&imu, uart, NULL)` or `jy901_probe_i2c(&imu, &bus_cfg)`.
+Tear down with
 the matching `*_remove(&imu)`; the bus is left alone.
 
 **Bus handles on ESP-IDF.** I2C chips take an `i2c_master_bus_handle_t` the
@@ -80,7 +82,8 @@ beyond that: printf() is the one sink.
 another driver probed it. Each chip's header lists them: `mpu6050.h` (ranges,
 rate/DLPF, sleep, I2C bypass, raw registers), `icm45686.h` (ranges, ODR,
 power, raw registers), `bmi088.h` (single-die and raw reads, data ready),
-`wt901.h` (the module's own angles, raw commands).
+`wt901.h` (the module's own angles, raw commands), `jy901.h` (the module's
+own angles, register writes on either bus).
 
 ### Mount: get the axes into your board's frame
 
@@ -112,7 +115,10 @@ so the probe gives up after 25 ms with `-EAGAIN`; `-ETIMEDOUT` means a START
 never completed. Check the wiring for either. SPI has no
 ACK, so an absent SPI chip (ICM-45686, ICM-42688-P, BMI088 or BMI270 over
 SPI) reads back a wrong ID
-and is `-ENODEV`. `-EBUSY` from a probe means that `imu_dev` is already bound.
+and is `-ENODEV`. The JY901 on I2C has no ID register; its probe is
+`-ENODEV` when `IICADDR` does not read back the address it answered at
+(see the [chip reference](chips.md#jy901)). `-EBUSY` from a probe means that
+`imu_dev` is already bound.
 On ESP-IDF bus failures map from `esp_err_t`: `ESP_ERR_TIMEOUT` is
 `-ETIMEDOUT`, `ESP_ERR_INVALID_ARG` `-EINVAL`, `ESP_ERR_INVALID_SIZE`
 `-EMSGSIZE`, `ESP_ERR_NO_MEM` `-ENOMEM` and the rest, a mid-transfer NACK
@@ -129,7 +135,7 @@ the rest of the sample. A BMI270 probe adds `-ETIMEDOUT` (the
 configuration file never reports loaded within the datasheet's 20 ms) and
 `-EPROTO` (the chip reports the load failed); see the
 [chip reference](chips.md#bmi270).
-The WT901 adds `-EBADMSG` (bytes arrive, but no frame's SUM ever matches)
-and `-ENODATA` (valid frames, but not the ones asked for); see the
-[chip reference](chips.md#wt901c-ttl).
+The WT901, and the JY901 on its UART, add `-EBADMSG` (bytes arrive, but no
+frame's SUM ever matches) and `-ENODATA` (valid frames, but not the ones
+asked for); see the [chip reference](chips.md#wt901c-ttl).
 `strerror(-ret)` names any of them.

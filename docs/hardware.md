@@ -174,3 +174,34 @@ no parity out of the box (chapter 6, p.30); this library reads "stop bit and
 parity bit 0" there as one stop bit and 8 data bits. The UART setup is the
 app's: an installed driver on ESP-IDF, a `HAL_UART_Init()`ed handle on the
 HAL.
+
+### JY901 — `examples/esp/jy901` (UART)
+
+Pin names are from §3 of `docs/WT901.pdf` (p.5), which names the module
+JY-901 in its IIC sections. On the UART only the four serial lines are used;
+SCL, SDA and D0–D3 stay open.
+
+| pin | goes to | note |
+|---|---|---|
+| VCC | 3.3 V or 5 V | the module regulates it: 3.3–5 V (§2 item 1, p.4) |
+| GND | GND | shared ground, always |
+| TX | the MCU's UART RX | GPIO 18 in the example; the module's serial output, TTL level (§3) |
+| RX | the MCU's UART TX | GPIO 17 in the example; the module's serial input, TTL level (§3) |
+
+TX and RX cross over. The link is TTL level, never RS232, at 9600 bps, 8
+data bits, no parity, one stop bit out of the box (chapter 6, p.30), as for
+the WT901C-TTL.
+
+### JY901 — `examples/stm/jy901` (I2C)
+
+| pin | goes to | note |
+|---|---|---|
+| VCC | 3.3 V or 5 V | 3.3–5 V (§2 item 1, p.4) |
+| GND | GND | shared ground, always |
+| SCL | PB8 | I2C1_SCL, AF4, open drain |
+| SDA | PB9 | I2C1_SDA, AF4, open drain. **4.7 k pull-ups on SDA and SCL**: the module's bus is open drain (§5.2, p.26) |
+| TX, RX, D0–D3 | nothing | leave open |
+
+I2C at up to 400 kHz (chapter 7, p.46), at 7-bit address 0x50 unless it was
+changed (§6.2.32, p.45). **An EEPROM at 0x50 on the same bus collides with
+this**; the probe refuses one, but both cannot share the address.

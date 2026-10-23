@@ -34,6 +34,7 @@ IMU_MPU6050         = y
 # IMU_WT901 is not set
 # IMU_BMI270 is not set
 # IMU_ICM42688 is not set
+# IMU_JY901 is not set
 ```
 
 or with `make menu`. esp-forge turns each line into `CONFIG_IMU_<CHIP>=y` in
@@ -86,6 +87,7 @@ define the module each chip uses, and its `.c` must be in the build:
 | `IMU_WT901` | `HAL_UART_MODULE_ENABLED` | `stm32f{4,7}xx_hal_uart.c` |
 | `IMU_ICM42688` | `HAL_I2C_MODULE_ENABLED`, `HAL_SPI_MODULE_ENABLED` or both: each probe is built with its own module | the matching ones |
 | `IMU_BMI270` | `HAL_I2C_MODULE_ENABLED`, `HAL_SPI_MODULE_ENABLED` or both: each probe is built with its own module | the matching ones |
+| `IMU_JY901` | `HAL_UART_MODULE_ENABLED`, `HAL_I2C_MODULE_ENABLED` or both: each probe is built with its own module | the matching ones |
 
 stm-forge's `mcu/stm32f4.cmake` and `mcu/stm32f7.cmake` already list all
 three sources, plus `_hal_i2c_ex.c` (for the `HAL_I2CEx_ConfigAnalogFilter()` that

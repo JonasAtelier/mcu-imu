@@ -13,7 +13,7 @@
 </p>
 
 A small C IMU library for **ESP-IDF 5.2+** and **STM32 HAL (F4/F7)**.
-Six chip drivers share one API for timestamped samples of acceleration in
+Seven chip drivers share one API for timestamped samples of acceleration in
 m/s², angular rate in rad/s and die temperature in °C, with board-axis
 mapping. This library replaces `esp-imu` and `stm-imu`.
 
@@ -30,7 +30,7 @@ component directory named `imu` as well.
 
 ## Supported hardware
 
-All six drivers support both platforms. Enable only the drivers you need.
+All seven drivers support both platforms. Enable only the drivers you need.
 
 | Chip | Bus | Notes |
 |---|---|---|
@@ -40,9 +40,11 @@ All six drivers support both platforms. Enable only the drivers you need.
 | **WT901C-TTL** | UART | Serial only; the module streams frames, each checked by its SUM |
 | **ICM-42688-P** | I2C or SPI | Register banks; anti-alias and UI filters set at probe; data ready on INT1 if asked; on STM32 one HAL module per probe |
 | **BMI270** | I2C or SPI | Bosch's 8 KB configuration file uploaded at every probe; data ready on INT1 if asked; on STM32 one HAL module per probe |
+| **JY901** | UART or I2C | WitMotion module, its own driver: the WT901's frame stream on the UART, one register burst on I2C at `0x50`; on STM32 one HAL module per probe |
 
 Wiring for every chip is in the [wiring guide](docs/hardware.md); the
-WT901's serial protocol is in the [chip reference](docs/chips.md#wt901c-ttl).
+WT901's serial protocol is in the [chip reference](docs/chips.md#wt901c-ttl),
+the JY901's two buses [there too](docs/chips.md#jy901).
 
 ## Install
 
@@ -162,6 +164,7 @@ axis mapping, logging, and error codes.
 | WT901C-TTL | — | — |
 | ICM-42688-P | [icm42688](examples/esp/icm42688/), on SPI | [icm42688](examples/stm/icm42688/main.c), on I2C with INT1 |
 | BMI270 | [bmi270](examples/esp/bmi270/), on I2C | [bmi270](examples/stm/bmi270/main.c), on SPI with INT1 |
+| JY901 | [jy901](examples/esp/jy901/), on the UART | [jy901](examples/stm/jy901/main.c), on I2C |
 
 ESP-IDF examples already locate this library through `EXTRA_COMPONENT_DIRS`.
 With ESP-IDF activated, build from an example directory:
@@ -187,17 +190,18 @@ Your application owns bus setup, scheduling, and locking.
   driver waits on an interrupt; the ICM-42688-P and the BMI270 can only
   route data ready to their INT1 pin for the app to wait on.
   The register chips poll a status register over the bus, and on the
-  MPU-6050 and ICM-45686 the raw register calls reach the rest; the WT901
-  waits for its own stream.
-- **WT901 rate:** `imu_read()` blocks up to one output period plus two
-  frames, about 125 ms at the defaults; the effective sample rate never
+  MPU-6050 and ICM-45686 the raw register calls reach the rest; the WT901,
+  and the JY901 on its UART, wait for their own stream.
+- **WT901 and JY901 serial rate:** `imu_read()` blocks up to one output
+  period plus two frames, about 125 ms at the defaults; the effective sample rate never
   exceeds the module's output rate, and a faster loop blocks.
 - **No unified range or rate API:** the steps do not line up — the BMI088's
   accelerometer runs 3/6/12/24 g, the MPU-6050 and ICM-45686 2 g upwards, and
   the rate
   schemes differ — so a common one would have to round.
 - **Not one instant:** the BMI088's accelerometer, gyroscope and temperature
-  are three transfers on two dies; the WT901's are two consecutive frames.
+  are three transfers on two dies; the WT901's, and the JY901's on its UART,
+  are two consecutive frames.
 - **Concurrency:** use one thread per device and bus handle, or supply a mutex.
   The HAL's own lock answers a clash with `HAL_BUSY`, which comes back as
   `-EAGAIN`.
