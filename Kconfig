@@ -59,6 +59,15 @@ if IMU
             the STM32 HAL each probe is built with its own module, I2C or
             SPI; one of them is needed.
 
+    config IMU_JY901
+        bool "WitMotion JY901 (serial or I2C)"
+        default n
+        help
+            Build the JY901 driver: jy901_probe_uart(), jy901_probe_i2c()
+            and friends, reading the module's frame stream on a UART or its
+            registers on I2C. On the STM32 HAL each probe is built with its
+            own module, UART or I2C; one of them is needed.
+
     config IMU_DEBUG
         bool "imu_dbg() lines"
         default n
