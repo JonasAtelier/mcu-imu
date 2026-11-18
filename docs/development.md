@@ -42,7 +42,8 @@ examples/
   stm/<chip-or-board>/      STM32 snippets: bmi088, bmi088_spi, bmi270, icm42688, icm45686, jy901, mpu6050
 docs/                       the five guides; datasheet PDFs here are gitignored
 assets/                     README and chip-reference figures
-CMakeLists.txt              ESP-IDF only; stm-forge globs src/**/*.c instead
+CMakeLists.txt              ESP-IDF component; elsewhere a static library for add_subdirectory(); stm-forge globs src/**/*.c instead
+                            the static library's options are Kconfig's bool entries, found by the type line directly under each `config`
 Kconfig                     IMU and IMU_<CHIP>, for ESP-IDF and both forges' menus
 idf_component.yml           ESP-IDF component manifest
 NOTICE                      third-party notices: Bosch's BMI270 configuration file
@@ -130,7 +131,8 @@ A driver is a probe, a remove and one read function:
    `imu_bus_detach()` and put both back to NULL; remove detaches too. Use
    `imu_err()` for anything the user needs to see.
 4. Guard your chip-specific calls with `imu->ops == &foo_ops`.
-5. Add `CONFIG_IMU_FOO` to the no-chip checks in `CMakeLists.txt` and
+5. Add `CONFIG_IMU_FOO` to the no-chip checks in `CMakeLists.txt` (its
+   ESP-IDF part; the `add_subdirectory()` part reads `Kconfig`) and
    `src/imu_port_stm.c`, a `src/foo/foo.c` line to `CMakeLists.txt`, a
    `config IMU_FOO` bool to `Kconfig`, `# IMU_FOO is not set` to both forges'
    defconfigs, and `test/esp/test_foo.c` and `test/stm/test_foo.c` (and
