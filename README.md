@@ -4,18 +4,29 @@ Read acceleration, angular velocity and temperature from a motion sensor, with t
 
 **Platforms** · ESP-IDF 5.2+ and STM32 HAL (F4/F7). Hardware testing is pending. The host tests use simulated devices.
 
+## Contents
+
+- [Supported hardware](#supported-hardware)
+- [Quick start](#quick-start)
+- [Using the library in your project](#using-the-library-in-your-project)
+- [License](#license)
+
 ## Supported hardware
 
-| Chip | Bus | Notes |
-|---|---|---|
-| **MPU-6050** | I2C | InvenSense 6-axis IMU |
-| **ICM-45686** | SPI | TDK InvenSense 6-axis IMU |
-| **BMI088** | I2C or SPI | Bosch 6-axis IMU on two dies |
-| **WT901C-TTL** | UART | WitMotion attitude module |
-| **ICM-42688-P** | I2C or SPI | TDK InvenSense 6-axis IMU |
-| **BMI270** | I2C or SPI | Bosch 6-axis IMU |
-| **JY901** | UART or I2C | WitMotion attitude module |
-| **LIS2DH12** | I2C | ST 3-axis accelerometer, motion interrupt |
+The bus column lists the interfaces the driver supports. The example links show which bus each program uses. All drivers return a timestamped `imu_sample` through `imu_read()`. [Shared API](include/imu.h)
+
+| Chip | Bus | Notes | Driver header | ESP-IDF project | STM32 HAL example |
+|---|---|---|---|---|---|
+| [MPU-6050](docs/chips.md#mpu-6050) | I2C | InvenSense 6-axis IMU | [mpu6050.h](include/mpu6050.h) | [I2C](examples/esp/mpu6050/) | [I2C](examples/stm/mpu6050/main.c) |
+| [ICM-45686](docs/chips.md#icm-45686) | SPI | TDK InvenSense 6-axis IMU | [icm45686.h](include/icm45686.h) | [SPI](examples/esp/icm45686/) | [SPI](examples/stm/icm45686/main.c) |
+| [BMI088](docs/chips.md#bmi088) | I2C or SPI | Bosch 6-axis IMU on two dies | [bmi088.h](include/bmi088.h) | [I2C](examples/esp/bmi088/) · [SPI](examples/esp/bmi088_spi/) | [I2C](examples/stm/bmi088/main.c) · [SPI](examples/stm/bmi088_spi/main.c) |
+| [WT901C-TTL](docs/chips.md#wt901c-ttl) | UART | WitMotion attitude module | [wt901.h](include/wt901.h) | — | — |
+| [ICM-42688-P](docs/chips.md#icm-42688-p) | I2C or SPI | TDK InvenSense 6-axis IMU | [icm42688.h](include/icm42688.h) | [SPI](examples/esp/icm42688/) | [I2C](examples/stm/icm42688/main.c) |
+| [BMI270](docs/chips.md#bmi270) | I2C or SPI | Bosch 6-axis IMU | [bmi270.h](include/bmi270.h) | [I2C](examples/esp/bmi270/) | [SPI](examples/stm/bmi270/main.c) |
+| [JY901](docs/chips.md#jy901) | UART or I2C | WitMotion attitude module | [jy901.h](include/jy901.h) | [UART](examples/esp/jy901/) | [I2C](examples/stm/jy901/main.c) |
+| [LIS2DH12](docs/chips.md#lis2dh12) | I2C | ST 3-axis accelerometer, motion interrupt | [lis2dh12.h](include/lis2dh12.h) | — | — |
+
+A dash marks a hardware and platform combination without a dedicated example.
 
 ## Quick start
 
@@ -84,7 +95,7 @@ int read_once(I2C_HandleTypeDef *bus)
 ## Using the library in your project
 
 - Add the component and enable the driver for your hardware. [Installation and build options](docs/installation.md)
-- Start from an example for your chip. The STM32 examples fit into a project with board setup already in place. [ESP-IDF examples](examples/esp/) · [STM32 examples](examples/stm/)
+- Open the ESP-IDF project for your hardware, or copy the STM32 example into a project with board setup already in place. [All ESP-IDF examples](examples/esp/) · [All STM32 examples](examples/stm/)
 - Look up calls and chip-specific settings. [API usage](docs/usage.md) · [Hardware reference](docs/chips.md)
 
 To run the simulated tests on your computer, run `make -C test test` from the library root. [Test requirements and coverage](docs/development.md)
@@ -101,3 +112,5 @@ with.
        alt="An ICM-45686 reading a board that is being rotated and shaken"
        width="100%">
 </p>
+
+[Browse the workshop catalog · ESP32 and STM32 drivers](https://github.com/JonasAtelier/jonas-atelier-libraries#esp32-and-stm32-drivers)
