@@ -1,37 +1,10 @@
-<p align="center">
-  <img src="assets/icm45686-imu.svg"
-       alt="An ICM-45686 reading a board that is being rotated and shaken"
-       width="100%">
-</p>
-
 # mcu-imu
 
-<p align="center">
-  <img alt="platform: ESP-IDF | STM32 HAL" src="https://img.shields.io/badge/platform-ESP--IDF%20%7C%20STM32%20HAL-70e1b2?style=flat-square&labelColor=0d2238">
-  <img alt="language: C" src="https://img.shields.io/badge/language-C-70e1b2?style=flat-square&labelColor=0d2238">
-  <img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-f2bd68?style=flat-square&labelColor=0d2238">
-</p>
+Read acceleration, angular velocity and temperature from a motion sensor, with timestamps and optional mapping into your board’s axes. Accelerometer-only devices report unavailable quantities as NaN.
 
-A small C IMU library for **ESP-IDF 5.2+** and **STM32 HAL (F4/F7)**.
-Eight chip drivers share one API for timestamped samples of acceleration in
-m/s², angular rate in rad/s and die temperature in °C, with board-axis
-mapping; an accelerometer-only chip reports NaN for what it lacks. This library replaces `esp-imu` and `stm-imu`.
-
-The repository is named `mcu-imu`; the C API, `CONFIG_IMU_*` options, and
-forge package key remain `imu`. The clone command below keeps the ESP-IDF
-component directory named `imu` as well.
-
-> **Hardware unverified.** Host tests use simulated devices and platform stubs.
-> Nothing here has run on a physical chip.
-
-[Supported hardware](#supported-hardware) · [Drivers](#drivers) ·
-[Install](#install) ·
-[Quick start](#quick-start) · [Examples](#examples) ·
-[Documentation](#documentation) · [Tests](#tests)
+**Platforms** · ESP-IDF 5.2+ and STM32 HAL (F4/F7). Hardware testing is pending. The host tests use simulated devices.
 
 ## Supported hardware
-
-All eight drivers support both platforms. Enable only the drivers you need.
 
 | Chip | Bus | Notes |
 |---|---|---|
@@ -44,174 +17,28 @@ All eight drivers support both platforms. Enable only the drivers you need.
 | **JY901** | UART or I2C | WitMotion attitude module |
 | **LIS2DH12** | I2C | ST 3-axis accelerometer, motion interrupt |
 
-Wiring for every chip is in the [wiring guide](docs/hardware.md); each
-driver's own notes, examples and limits are under [Drivers](#drivers).
+## Quick start
 
-## Drivers
+Connect an MPU-6050 over I2C and match `PIN_SDA` and `PIN_SCL` to the wiring. The example uses address 0x68.
 
-<details><summary><b>MPU-6050</b> — I2C</summary>
-
-Address `0x68` or `0x69` by AD0; found on GY-521 boards.
-
-- Examples: ESP-IDF [mpu6050](examples/esp/mpu6050/) · STM32 HAL
-  [mpu6050](examples/stm/mpu6050/main.c)
-- Chip reference: [MPU-6050](docs/chips.md#mpu-6050)
-
-</details>
-
-<details><summary><b>ICM-45686</b> — SPI</summary>
-
-SPI only in this driver, mode 3; full-scale codes run backwards.
-
-- Examples: ESP-IDF [icm45686](examples/esp/icm45686/) · STM32 HAL
-  [icm45686](examples/stm/icm45686/main.c)
-- Chip reference: [ICM-45686](docs/chips.md#icm-45686)
-
-</details>
-
-<details><summary><b>BMI088</b> — I2C or SPI</summary>
-
-Two dies, each with its own address or chip select; on STM32 both HAL modules
-are needed.
-
-- Examples over I2C: ESP-IDF [bmi088](examples/esp/bmi088/) · STM32 HAL
-  [bmi088](examples/stm/bmi088/main.c)
-- Examples over SPI: ESP-IDF [bmi088_spi](examples/esp/bmi088_spi/) ·
-  STM32 HAL [bmi088_spi](examples/stm/bmi088_spi/main.c)
-- **Not one instant:** accelerometer, gyroscope and temperature are three
-  transfers on two dies.
-- Chip reference: [BMI088](docs/chips.md#bmi088)
-
-</details>
-
-<details><summary><b>WT901C-TTL</b> — UART</summary>
-
-Serial only; the module streams frames, each checked by its SUM.
-
-- Examples: none.
-- **WT901 rate:** `imu_read()` blocks up to one output period plus two
-  frames, about 125 ms at the defaults; the effective sample rate never
-  exceeds the module's output rate, and a faster loop blocks.
-- **Not one instant:** accelerometer and gyroscope are two consecutive
-  frames.
-- Chip reference, with the serial protocol:
-  [WT901C-TTL](docs/chips.md#wt901c-ttl)
-
-</details>
-
-<details><summary><b>ICM-42688-P</b> — I2C or SPI</summary>
-
-Register banks; anti-alias and UI filters set at probe; data ready on INT1 if
-asked; on STM32 one HAL module per probe.
-
-- Examples: ESP-IDF [icm42688](examples/esp/icm42688/), on SPI · STM32 HAL
-  [icm42688](examples/stm/icm42688/main.c), on I2C with INT1
-- Chip reference: [ICM-42688-P](docs/chips.md#icm-42688-p)
-
-</details>
-
-<details><summary><b>BMI270</b> — I2C or SPI</summary>
-
-Bosch's 8 KB configuration file uploaded at every probe; data ready on INT1
-if asked; on STM32 one HAL module per probe.
-
-- Examples: ESP-IDF [bmi270](examples/esp/bmi270/), on I2C · STM32 HAL
-  [bmi270](examples/stm/bmi270/main.c), on SPI with INT1
-- Chip reference: [BMI270](docs/chips.md#bmi270)
-
-</details>
-
-<details><summary><b>JY901</b> — UART or I2C</summary>
-
-WitMotion module, its own driver: the WT901's frame stream on the UART, one
-register burst on I2C at `0x50`; on STM32 one HAL module per probe.
-
-- Examples: ESP-IDF [jy901](examples/esp/jy901/), on the UART · STM32 HAL
-  [jy901](examples/stm/jy901/main.c), on I2C
-- **Serial rate:** on its UART, `imu_read()` blocks up to one output period
-  plus two frames, about 125 ms at the defaults; the effective sample rate
-  never exceeds the module's output rate, and a faster loop blocks.
-- **Not one instant:** on its UART, accelerometer and gyroscope are two
-  consecutive frames.
-- Chip reference, with both buses: [JY901](docs/chips.md#jy901)
-
-</details>
-
-<details><summary><b>LIS2DH12</b> — I2C</summary>
-
-Address `0x18` or `0x19` by SA0; low-power, normal or high-resolution mode;
-a motion detector on INT1 (threshold, duration, high-pass filter, latch).
-
-- Examples: none.
-- **Accelerometer only:** `imu_read()` gives NaN for the gyroscope and the
-  temperature.
-- **Unverified register map:** written from memory of the datasheet, which is
-  not in `docs/` yet; the values to check are listed in the
-  [chip reference](docs/chips.md#lis2dh12).
-- **Seen on one board** (omoide, I2C 0x18, 2026-11-18): the probe passes (it
-  requires WHO_AM_I `0x33` at `0x0F`); the nine control registers the driver
-  writes read back as written; INT1 idles high with `int_active_low`. The
-  read-back and the INT1 level were seen through the mira application's
-  diagnostic, not through this library's own tests. Not seen yet: a motion
-  event on INT1, and an acceleration value checked against a known orientation.
-  A register that reads back what was written shows the address holds a value,
-  not that its bits mean what the driver assumes.
-- Chip reference: [LIS2DH12](docs/chips.md#lis2dh12)
-
-</details>
-
-## Install
-
-### ESP-IDF
-
-Clone into your project's components directory:
+In a terminal with ESP-IDF activated, get the example and select the target for an ESP32. Change the target if your board uses another ESP32 chip.
 
 ```sh
-git clone https://github.com/JonasAtelier/mcu-imu components/imu
+git clone https://github.com/JonasAtelier/mcu-imu.git imu
+cd imu/examples/esp/mpu6050
+idf.py set-target esp32
 ```
 
-Enable your chips in `idf.py menuconfig` → **Component config → IMU
-subsystem**, or add this to `sdkconfig.defaults` for the MPU-6050:
+Check the [wiring guide](docs/hardware.md) and edit the settings in [main.c](examples/esp/mpu6050/main/main.c) to match your board. Connect the board by USB, then build, upload and open the serial monitor.
 
-```ini
-CONFIG_IMU=y
-CONFIG_IMU_MPU6050=y
+```sh
+idf.py build flash monitor
 ```
 
-The `main` component sees the library automatically. Other components declare
-`REQUIRES imu driver` in `idf_component_register()`.
+Rotate the board to see acceleration in m/s² and angular velocity in rad/s change. Apply sensor bias and scale calibration in your application.
 
-### esp-forge / stm-forge
-
-stm-forge must be at `ee921c3` or later, which builds the chip folders in
-`src/`; older ones fail at link with undefined chip probes.
-
-Add to `profiles/pkgversion`:
-
-```make
-imu_GIT=https://github.com/JonasAtelier/mcu-imu@stable
-```
-
-Enable the package and your chip in `configs/<target>_defconfig`:
-
-```make
-PKG_imu            = y
-IMU_MPU6050        = y
-```
-
-### STM32 HAL without forge
-
-Compile every `.c` under `src/`, chip folders included, add `include/` and
-`src/` to the include path, and define
-`CMSIS_device_header` as your family header (`"stm32f4xx.h"` or
-`"stm32f7xx.h"`), `USE_HAL_DRIVER`, and `CONFIG_IMU_<CHIP>=1` for each
-selected chip. Enable and compile its required HAL modules.
-
-**No chip driver is enabled by default.** See the
-[installation guide](docs/installation.md) for all chip options, HAL module
-requirements and float logging.
-
-## Quick start
+<details>
+<summary>STM32 HAL example for an initialised bus</summary>
 
 Initialise the bus in your application, then probe the sensor, wait for a
 fresh sample, and read it. This STM32 helper assumes the passed I2C handle is
@@ -252,88 +79,15 @@ int read_once(I2C_HandleTypeDef *bus)
 }
 ```
 
-Call `read_once(&hi2c1)` from thread context. On ESP-IDF, use an
-`i2c_master_bus_handle_t` and a FreeRTOS task delay; the
-[MPU-6050 example](examples/esp/mpu6050/main/main.c) shows the bus setup.
-For continuous sampling, probe once, poll and read in your loop, and remove
-when finished.
+</details>
 
-- `imu_read()` returns board-frame acceleration in **m/s²**, angular rate in
-  **rad/s** and temperature in **°C**, plus `t_us`.
-- Integer-returning API calls return **0 or a negative errno**. Use a sample
-  only on success; errors leave it unchanged.
-- Set `imu.mount` to map chip axes into board axes; all zero means identity.
+## Using the library in your project
 
-See [API usage](docs/usage.md) for device lifetime, bus handles, timestamps,
-axis mapping, logging, and error codes.
+- Add the component and enable the driver for your hardware. [Installation and build options](docs/installation.md)
+- Start from an example for your chip. The STM32 examples fit into a project with board setup already in place. [ESP-IDF examples](examples/esp/) · [STM32 examples](examples/stm/)
+- Look up calls and chip-specific settings. [API usage](docs/usage.md) · [Hardware reference](docs/chips.md)
 
-## Examples
-
-Each driver's examples are listed under [Drivers](#drivers).
-
-ESP-IDF examples already locate this library through `EXTRA_COMPONENT_DIRS`.
-With ESP-IDF activated, build from an example directory:
-
-```sh
-cd examples/esp/mpu6050
-idf.py set-target esp32 # Replace with your board's target.
-idf.py build
-```
-
-STM32 examples are snippets
-to integrate into your application, with clock setup and logging retargeting
-provided by you. Check the example's pin definitions against your board and
-read the [wiring guide](docs/hardware.md).
-
-## Scope and limitations
-
-The library provides a shared sample format and synchronous chip drivers.
-Your application owns bus setup, scheduling, and locking.
-
-- **Calibration:** bias and scale correction belong above `imu_read()`.
-- **Blocking bus calls:** no FIFO, DMA, DMP/APEX or self-test, and no
-  driver waits on an interrupt; the ICM-42688-P and the BMI270 can only
-  route data ready to their INT1 pin for the app to wait on, and the
-  LIS2DH12 its motion detector.
-  The register chips poll a status register over the bus, and on the
-  MPU-6050 and ICM-45686 the raw register calls reach the rest; the WT901,
-  and the JY901 on its UART, wait for their own stream.
-- **No unified range or rate API:** the steps do not line up — the BMI088's
-  accelerometer runs 3/6/12/24 g, the MPU-6050 and ICM-45686 2 g upwards, and
-  the rate
-  schemes differ — so a common one would have to round.
-- **Concurrency:** use one thread per device and bus handle, or supply a mutex.
-  The HAL's own lock answers a clash with `HAL_BUSY`, which comes back as
-  `-EAGAIN`.
-- **No bus setup:** pins, clocks, speed and SPI mode are the app's; the
-  drivers only check what they can see in the handle.
-- **STM32 timestamps:** the default clock has millisecond resolution and wraps
-  after 49.7 days. Override `imu_time_us()` if needed.
-
-## Documentation
-
-| Guide | Contents |
-|---|---|
-| [Installation](docs/installation.md) | Forge, ESP-IDF, STM32 HAL, build options and logging setup |
-| [Hardware](docs/hardware.md) | Wiring and pins for each chip |
-| [API usage](docs/usage.md) | Lifecycle, bus handles, timing, mounting and errors |
-| [Chip reference](docs/chips.md) | Ranges, rates, protocol details, provenance and datasheet assumptions |
-| [Development](docs/development.md) | Platform ports, bus abstraction, adding a driver and test coverage |
-
-Public interfaces live in [include/](include/); chip drivers and platform ports
-live in [src/](src/). The [repository layout](docs/development.md#repository-layout)
-maps every directory and the file-naming rule for chip folders.
-
-## Tests
-
-```sh
-make -C test test
-```
-
-Host-only tests use stubbed HAL and ESP-IDF APIs; no embedded toolchain or
-physical sensor is needed. See the [test reference](docs/development.md#tests)
-for compiler requirements and coverage. Error logs during the suite are
-expected: tests deliberately exercise failure paths.
+To run the simulated tests on your computer, run `make -C test test` from the library root. [Test requirements and coverage](docs/development.md)
 
 ## License
 
@@ -341,3 +95,9 @@ expected: tests deliberately exercise failure paths.
 file for the chip under the BSD 3-Clause licence; [NOTICE](NOTICE) has its
 origin and Bosch's notice, which a firmware built with `IMU_BMI270` must ship
 with.
+
+<p align="center">
+  <img src="assets/icm45686-imu.svg"
+       alt="An ICM-45686 reading a board that is being rotated and shaken"
+       width="100%">
+</p>
