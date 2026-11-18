@@ -205,3 +205,23 @@ the WT901C-TTL.
 I2C at up to 400 kHz (chapter 7, p.46), at 7-bit address 0x50 unless it was
 changed (§6.2.32, p.45). **An EEPROM at 0x50 on the same bus collides with
 this**; the probe refuses one, but both cannot share the address.
+
+### LIS2DH12 — no example
+
+The bare chip on a board, I2C. Pin names are the datasheet's (section 4,
+"Pin description"; UNVERIFIED, see the [chip reference](chips.md#lis2dh12)).
+
+| pin | goes to | note |
+|---|---|---|
+| VDD, VDD_IO | 3.3 V | 1.71–3.6 V; 100 nF at VDD |
+| GND, RES | GND | RES is a reserved pin tied to GND |
+| CS | VDD_IO | high selects I2C; low would select SPI |
+| SCL/SPC | SCL | 4.7 k pull-up to VDD_IO |
+| SDA/SDI/SDO | SDA | 4.7 k pull-up to VDD_IO |
+| SDO/SA0 | GND or VDD_IO | address bit 0: 0x18 low, 0x19 high. Tied to a rail, `sa0_pullup_off` saves the internal pull-up's current |
+| INT1 | a GPIO | push-pull, no pull-up needed; polarity by `int_active_low` |
+| INT2 | nothing | not used by the driver |
+
+I2C at up to 400 kHz. The INT1 pin drives both levels from power-up, at
+active high until the probe says otherwise, so it idles low before the
+probe and high after it with `int_active_low`.

@@ -13,9 +13,9 @@
 </p>
 
 A small C IMU library for **ESP-IDF 5.2+** and **STM32 HAL (F4/F7)**.
-Seven chip drivers share one API for timestamped samples of acceleration in
+Eight chip drivers share one API for timestamped samples of acceleration in
 m/s², angular rate in rad/s and die temperature in °C, with board-axis
-mapping. This library replaces `esp-imu` and `stm-imu`.
+mapping; an accelerometer-only chip reports NaN for what it lacks. This library replaces `esp-imu` and `stm-imu`.
 
 The repository is named `mcu-imu`; the C API, `CONFIG_IMU_*` options, and
 forge package key remain `imu`. The clone command below keeps the ESP-IDF
@@ -31,7 +31,7 @@ component directory named `imu` as well.
 
 ## Supported hardware
 
-All seven drivers support both platforms. Enable only the drivers you need.
+All eight drivers support both platforms. Enable only the drivers you need.
 
 | Chip | Bus | Notes |
 |---|---|---|
@@ -42,6 +42,7 @@ All seven drivers support both platforms. Enable only the drivers you need.
 | **ICM-42688-P** | I2C or SPI | TDK InvenSense 6-axis IMU |
 | **BMI270** | I2C or SPI | Bosch 6-axis IMU |
 | **JY901** | UART or I2C | WitMotion attitude module |
+| **LIS2DH12** | I2C | ST 3-axis accelerometer, motion interrupt |
 
 Wiring for every chip is in the [wiring guide](docs/hardware.md); each
 driver's own notes, examples and limits are under [Drivers](#drivers).
@@ -133,6 +134,29 @@ register burst on I2C at `0x50`; on STM32 one HAL module per probe.
 - **Not one instant:** on its UART, accelerometer and gyroscope are two
   consecutive frames.
 - Chip reference, with both buses: [JY901](docs/chips.md#jy901)
+
+</details>
+
+<details><summary><b>LIS2DH12</b> — I2C</summary>
+
+Address `0x18` or `0x19` by SA0; low-power, normal or high-resolution mode;
+a motion detector on INT1 (threshold, duration, high-pass filter, latch).
+
+- Examples: none.
+- **Accelerometer only:** `imu_read()` gives NaN for the gyroscope and the
+  temperature.
+- **Unverified register map:** written from memory of the datasheet, which is
+  not in `docs/` yet; the values to check are listed in the
+  [chip reference](docs/chips.md#lis2dh12).
+- **Seen on one board** (omoide, I2C 0x18, 2026-11-18): the probe passes (it
+  requires WHO_AM_I `0x33` at `0x0F`); the nine control registers the driver
+  writes read back as written; INT1 idles high with `int_active_low`. The
+  read-back and the INT1 level were seen through the mira application's
+  diagnostic, not through this library's own tests. Not seen yet: a motion
+  event on INT1, and an acceleration value checked against a known orientation.
+  A register that reads back what was written shows the address holds a value,
+  not that its bits mean what the driver assumes.
+- Chip reference: [LIS2DH12](docs/chips.md#lis2dh12)
 
 </details>
 
@@ -269,7 +293,8 @@ Your application owns bus setup, scheduling, and locking.
 - **Calibration:** bias and scale correction belong above `imu_read()`.
 - **Blocking bus calls:** no FIFO, DMA, DMP/APEX or self-test, and no
   driver waits on an interrupt; the ICM-42688-P and the BMI270 can only
-  route data ready to their INT1 pin for the app to wait on.
+  route data ready to their INT1 pin for the app to wait on, and the
+  LIS2DH12 its motion detector.
   The register chips poll a status register over the bus, and on the
   MPU-6050 and ICM-45686 the raw register calls reach the rest; the WT901,
   and the JY901 on its UART, wait for their own stream.

@@ -11,7 +11,7 @@ include/                    public API, the only directory apps include
   imu.h                     struct imu_dev, imu_read(), imu_time_us()
   imu_log.h                 imu_err/warn/info/dbg, imu_log_sample()
   mpu6050.h icm45686.h bmi088.h wt901.h bmi270.h icm42688.h jy901.h
-                            one header per chip: probe, remove, extras
+  lis2dh12.h                one header per chip: probe, remove, extras
 src/                        private to the library
   imu.c                     the core: timestamp, ops.read, mount rotation
   imu_log.c                 imu_log_sample()
@@ -26,12 +26,14 @@ src/                        private to the library
   icm42688/                 icm42688.c  icm42688_regs.h  icm42688_math.h  icm42688_priv.h
   bmi270/                   bmi270.c  bmi270_regs.h  bmi270_math.h  bmi270_priv.h
                             bmi270_config_file.c: Bosch's configuration file (BSD-3-Clause, see NOTICE)
+  lis2dh12/                 lis2dh12.c  lis2dh12_regs.h  lis2dh12_math.h  lis2dh12_priv.h
 test/                       host tests, `make -C test test`
   test_<chip>_math.c        maths tests: no bus and no platform API
   wt901_cases.h             WT901 cases, shared by esp/ and stm/
   jy901_cases.h             a fake JY901, its UART line and its I2C registers, shared by esp/ and stm/
   bmi270_cases.h            a fake BMI270 and its cases, shared by esp/ and stm/, each run on I2C and SPI
   icm42688_cases.h          a fake ICM-42688-P with its register banks, the same way
+  lis2dh12_cases.h          a fake LIS2DH12 and its cases, shared by esp/ and stm/, I2C only
   esp/                      suites on idf_stubs/, through imu_port_esp.c
   stm/                      suites on hal_stubs/, through imu_port_stm.c
   idf_stubs/  hal_stubs/    the slice of ESP-IDF and of the HAL the code calls
@@ -168,6 +170,8 @@ chip through ESP-IDF's calls instead (`i2c_master_*`, `spi_device_*`,
 | `{esp,stm}/test_icm42688` | one fake ICM-42688-P in `test/icm42688_cases.h`, each case on I2C and on SPI: **banks 0, 1, 2 and 4 kept apart, so a register written in the wrong bank is caught**, bank 0 again after every banked access; nothing heard for 1 ms after the soft reset; **a write other than rate, scale or power mode while a sensor runs (12.9), or any write within 200 us of a sensor coming on, counted and failed**; the 12.3 I2C settings on I2C only; the anti-alias rows 1, 13, 20, 24, 40 and 63 in the right registers with reserved bits kept, bypass alone; UI filter order and bandwidth; the interrupt both ways with `INT_ASYNC_RESET` cleared, the latched pin released by a sample read; the big-endian burst and temperature; rate, scale and power changes after probe; the bank escape hatch; refused codes before any allocation or traffic; a bus error at every transfer of a full probe ends it with nothing bound or leaked |
 | `test_bmi270_math` | Tables 2 to 4: every range's sensitivity, the rate codes and which are valid, temperature at 23 °C, both ends and the invalid code; `GYR_CAS` sign extension, the cross-axis correction with its integer division and 16-bit limit |
 | `{esp,stm}/test_bmi270` | one fake BMI270 in `test/bmi270_cases.h`, each case on I2C and on SPI: the interface I2C after power-up and every soft reset until a CSB edge and 200 us; the SPI dummy byte; a write lost if it comes before the idle time of the power mode it follows (450 us, 2 us); the upload only to a prepared chip, at its `INIT_ADDR`, **byte for byte equal to Bosch's file** (274 pieces, none over 30 bytes), `INIT_CTRL` = 1 once per reset; `-EPROTO` for a reported load error or one corrupted byte, `-ETIMEDOUT` no earlier than 20 ms, `-ENODEV` with nothing written; a bus error at every 37th transfer and the last one ends the probe with nothing bound or leaked; every register of a full config and of the interrupt both ways; the burst, cross-axis correction, NaN temperature, `INT_STATUS_1` cleared; rate and range changes keeping the filter bits; refused configs before any allocation or bus traffic. Per platform: the address, clock and SPI mode passed or refused, `-ENXIO` before allocation, the HAL's status as errno |
+| `test_lis2dh12_math` | the mg/count table per mode and full scale, 12/48/192 at 16 g; left-justified words cut to 8, 10 and 12 bits, worked by hand, signs and both ends; which rate codes each mode runs; the motion threshold's step per full scale, rounding and its 1..127 limits; `INT1_SRC` and `INT1_CFG` bit by bit. Checked against the remembered register map, which is itself UNVERIFIED (`docs/chips.md`) |
+| `{esp,stm}/test_lis2dh12` | one fake LIS2DH12 in `test/lis2dh12_cases.h`, on I2C: **a multi-byte read without the auto-increment bit repeats the first register**, so a burst without it fails; **`LPen` and `HR` set together counted and failed**, from every starting mode; `CTRL_REG0`'s fixed bits and the 7-bit registers' bit 7 kept; no write to a read-only address; a probe over a chip left dirty by an earlier run writes every control register and reads the old latched event away; every mode and full scale scaled, gyroscope and temperature NaN; the motion detector's registers, the filter reset by a `REFERENCE` read after the filter is on, the event decoded and released, the threshold rewritten on a full-scale change and a change it would not fit refused; refused configs before any allocation or traffic; a bus error at every transfer of a full probe and of the motion setup, nothing bound or leaked and the retry clean. Per platform: the address and clock passed or refused, `-ENXIO` before allocation, the HAL's status as errno; on ESP-IDF the driver never waits |
 
 All build under `-std=gnu11 -Wall -Wextra -Werror -pedantic`, with
 `-Wl,--wrap` (GNU ld) to count allocations and capture `printf()`.

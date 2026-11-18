@@ -655,3 +655,146 @@ Pitch and Yaw from 0x3d, §7.2's own example.
 - §5.5 (p.18) says the default baud rate is 115200; §2 item 11 (p.5),
   §5.6 (p.18), §6.2 reminder 1 (p.35) and chapter 6 say 9600. The driver
   and the examples assume 9600.
+
+## LIS2DH12
+
+ST's 3-axis accelerometer: ±2 to ±16 g, 1 Hz to 5.3 kHz, a few microamps in
+its low-power mode, over I2C (this driver) or SPI (not here). No gyroscope:
+`imu_read()` fills the gyroscope with NaN, and the temperature too, because
+the part's sensor only gives changes with no absolute offset. On the STM32
+HAL it needs the I2C module.
+
+**The register map is unverified.** The datasheet (DocID025056) is not in
+`docs/`; every address, bit, table value and section number in
+`src/lis2dh12/lis2dh12_regs.h` and `lis2dh12_math.h` was written from memory
+of it, and the host tests check the driver against that same memory. The
+list at the end of this section is what to read off the PDF before trusting
+the driver on hardware.
+
+Seen on one board (omoide, I2C 0x18, 2026-11-18): the probe passes (it
+requires WHO_AM_I `0x33` at `0x0F`); the nine control registers the driver
+writes read back as written; INT1 idles high with `int_active_low`. The
+read-back and the INT1 level were seen through the mira application's
+diagnostic, not through this library's own tests. Not seen yet: a motion event
+on INT1, and an acceleration value checked against a known orientation. A
+register that reads back what was written shows the address holds a value, not
+that its bits mean what the driver assumes.
+
+| Function | Does |
+|---|---|
+| `lis2dh12_probe_i2c(&imu, &bus_cfg, cfg)` | Presence, WHO_AM_I `0x33`, every control register to a known state, mode, rate, full scale |
+| `lis2dh12_remove(&imu)` | Power-down, release the driver's state |
+| `imu_read(&imu, &s)` | One burst, X Y Z, in m/s²; gyroscope and temperature NaN |
+| `lis2dh12_read_raw(&imu, a)` | The same burst as counts at the mode's resolution |
+| `lis2dh12_data_ready(&imu, &b)` | `STATUS_REG.ZYXDA` |
+| `lis2dh12_set_mode(&imu, mode, odr, fs)` | Mode, rate (power-down included) and full scale, at any time |
+| `lis2dh12_set_motion(&imu, &m)` | The motion detector on INT1, or off |
+| `lis2dh12_read_motion(&imu, &active, &axes)` | `INT1_SRC`: the event and its axes; clears a latched one |
+| `lis2dh12_accel_sensitivity(&imu)` | Counts per g at the mode and full scale |
+| `lis2dh12_reg_read` / `_reg_write` | Any register: click, 6D, free-fall, FIFO, INT2 |
+
+### No reset, so the probe writes everything
+
+The part has no soft reset of its user registers (`CTRL_REG5.BOOT` reloads
+the trimming only), so a probe after an MCU reset finds whatever the last run
+left: a latched event, the FIFO on, high-resolution mode. The probe reads
+WHO_AM_I before writing anything (`-ENODEV` otherwise; a LIS3DH also reads
+`0x33`), then writes: `CTRL_REG3` 0 (nothing routed to INT1), the
+temperature sensor off, `CTRL_REG5` 0 (FIFO off, no latch), FIFO bypass,
+both interrupt generators, click and sleep-to-wake off, `CTRL_REG0` with the
+SA0 pull-up choice and its fixed `0010000`, the high-pass cut-off, the pin
+polarity, the mode, and last reads `INT1_SRC` so an old latched event is
+gone.
+
+### Modes, rates, full scales
+
+| Mode | Bits | `LPen` | `HR` | mg/count at 2 / 4 / 8 / 16 g |
+|---|---|---|---|---|
+| Low power | 8 | 1 | 0 | 16 / 32 / 64 / 192 |
+| Normal | 10 | 0 | 0 | 4 / 8 / 16 / 48 |
+| High resolution | 12 | 0 | 1 | 1 / 2 / 4 / 12 |
+
+`LPen` and `HR` both set is not allowed; `lis2dh12_set_mode()` clears `HR`,
+writes `CTRL_REG1` with `LPen`, then sets `HR` if asked, so the two are
+never on together from any starting mode. Block data update is always on, so
+a burst never mixes two samples. The samples are left-justified 16-bit words,
+little endian, read in one burst from `OUT_X_L` with the I2C auto-increment
+bit (bit 7 of the sub-address) set.
+
+Rates: power-down, 1, 10, 25, 50, 100, 200, 400 Hz, 1620 Hz (low power
+only) and code 9, which is 1344 Hz in normal and high resolution and 5376 Hz
+in low power. The probe refuses power-down (a zeroed config would otherwise
+be a chip that never samples); `lis2dh12_set_mode()` takes it.
+
+### The motion detector
+
+Interrupt generator 1 in OR mode: any axis in `axes` above `threshold_g`
+for more than `duration` samples raises `INT1_SRC.IA`, routed to INT1
+(`CTRL_REG3.I1_IA1`). The threshold is per axis, not the vector's length,
+in steps of 16, 32, 62 or 186 mg by full scale, 1 to 127 of them; the driver
+rounds to the nearest and refuses what does not fit, and rewrites it when
+`lis2dh12_set_mode()` changes the full scale (refusing a full scale it would
+not fit). With `high_pass` the generator sees high-pass-filtered data
+(`CTRL_REG2.HP_IA1`) at the configured cut-off, so orientation does not
+count, and the driver reads `REFERENCE` once to start the filter at the
+present acceleration instead of zero. The output registers stay unfiltered,
+so `imu_read()` still sees gravity. Latched (`CTRL_REG5.LIR_INT1`), the
+event holds until `lis2dh12_read_motion()` reads `INT1_SRC`.
+
+Cut-off codes (`high_pass_cutoff`), as a fraction of the rate, from ST's
+application note figures for this family: 0 about ODR/50, 1 about ODR/100,
+2 about ODR/200, 3 about ODR/400 (at 50 Hz: 1, 0.5, 0.2, 0.1 Hz).
+
+### Supply current
+
+Estimates from the datasheet's current table as remembered, at 2.5 V
+(UNVERIFIED): power-down 0.5 uA; low power 2 uA at 1 Hz, 3.5 at 10, 6 at
+50, 10 at 100, 18 at 200 Hz; normal and high resolution 2 at 1 Hz, 11 at
+50, 20 at 100, 38 at 200 Hz, 185 uA at 1344 Hz. The SA0 pull-up adds its
+own current when SA0 is tied low and the pull-up is left connected.
+
+### What is not here
+
+SPI, the FIFO, click and double click, 6D and 4D orientation, free-fall
+(AND mode), interrupt generator 2 and the INT2 pin, sleep-to-wake
+(`ACT_THS`), the temperature sensor and the ADC, self-test. The self-test
+was left out because its pass band is remembered as 17 to 360 but in two
+units (LSb in the datasheet table, mg in ST's example code), four times
+apart in normal mode; it goes in once the table is read.
+
+### UNVERIFIED: check against DocID025056
+
+1. Register addresses: WHO_AM_I 0x0F (value 0x33), CTRL_REG0 0x1E,
+   TEMP_CFG_REG 0x1F, CTRL_REG1-6 0x20-0x25, REFERENCE 0x26, STATUS_REG
+   0x27, OUT_X_L..OUT_Z_H 0x28-0x2D, FIFO_CTRL_REG 0x2E, INT1_CFG 0x30,
+   INT1_SRC 0x31, INT1_THS 0x32, INT1_DURATION 0x33, INT2_CFG 0x34,
+   CLICK_CFG 0x38, ACT_THS 0x3E; and the section numbers cited for them
+   (9.4-9.37).
+2. I2C: addresses 0x18 / 0x19 by SA0; bit 7 of the sub-address enables
+   auto-increment; 400 kHz maximum.
+3. `CTRL_REG0`: bits 6:0 must be `0010000`; bit 7 `SDO_PU_DISC`
+   disconnects the SA0 pull-up; the pull-up's current with SA0 tied low.
+4. `CTRL_REG1`: ODR in bits 7:4 with the codes and rates above (code 8
+   low power only, code 9 mode-dependent); `LPen` bit 3; X/Y/Z enable bits
+   2:0.
+5. `CTRL_REG4`: BDU bit 7, FS bits 5:4, HR bit 3; `LPen` + `HR` not
+   allowed.
+6. Sensitivities: the mg/count table above, in particular 12 / 48 / 192 at
+   16 g.
+7. `CTRL_REG2`: HPM bits 7:6 (00 = normal, reset by reading REFERENCE),
+   HPCF bits 5:4, FDS bit 3, HP_IA1 bit 0; the cut-off fractions above; that
+   reading REFERENCE resets the filter.
+8. `CTRL_REG3.I1_IA1` bit 6; `CTRL_REG5.LIR_INT1` bit 3; `CTRL_REG6`
+   `INT_POLARITY` bit 1 (1 = active low) for both pins; INT1 push-pull with
+   no open-drain option.
+9. `INT1_CFG`: AOI bit 7, 6D bit 6, ZHIE bit 5, YHIE bit 3, XHIE bit 1;
+   that the high events compare each axis's absolute value with the
+   threshold.
+10. `INT1_SRC`: IA bit 6, ZH bit 5, YH bit 3, XH bit 1; cleared by reading.
+11. `INT1_THS` 7 bits, steps 16 / 32 / 62 / 186 mg; `INT1_DURATION` 7
+    bits, one step per sample.
+12. `STATUS_REG.ZYXDA` bit 3.
+13. The turn-on times (7 samples in high resolution, 1 otherwise) and the
+    current table above.
+14. Pins: CS high selects I2C; RES tied to GND; INT1 drives both levels from
+    power-up, active high by default.
