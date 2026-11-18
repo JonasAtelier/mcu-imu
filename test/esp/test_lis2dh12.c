@@ -134,6 +134,8 @@ static void test_bus_configs(void)
 	i2c = (struct lis2dh12_i2c_config){ .bus = I2C_BUS,
 					    .clock_hz = 400001 };
 	assert(lis2dh12_probe_i2c(&imu, &i2c, &base) == -EINVAL);
+	i2c = (struct lis2dh12_i2c_config){ .bus = I2C_BUS, .timeout_ms = -1 };
+	assert(lis2dh12_probe_i2c(&imu, &i2c, &base) == -EINVAL);
 	i2c = (struct lis2dh12_i2c_config){ .bus = NULL };
 	assert(lis2dh12_probe_i2c(&imu, &i2c, &base) == -EINVAL);
 	assert(lis2dh12_probe_i2c(&imu, NULL, &base) == -EINVAL);

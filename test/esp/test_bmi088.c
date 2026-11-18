@@ -467,6 +467,11 @@ static void test_rejects_bad_bus_config(void)
 	i2c_bad.accel_address = 0x20;
 	EXPECT_EQ(bmi088_probe_i2c(&imu, &i2c_bad, NULL), -EINVAL);
 
+	/* Negative used to reach IDF, where -1 waits for ever; now refused. */
+	i2c_bad = i2c_config();
+	i2c_bad.timeout_ms = -1;
+	EXPECT_EQ(bmi088_probe_i2c(&imu, &i2c_bad, NULL), -EINVAL);
+
 	EXPECT_EQ(add_count, 0);
 }
 

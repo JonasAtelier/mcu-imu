@@ -161,13 +161,15 @@ int bmi088_probe_i2c(struct imu_dev *imu,
 		return -EINVAL;
 	}
 	scl_hz = bus_config->clock_hz ? bus_config->clock_hz : BMI088_I2C_HZ;
-	/* As before: any nonzero value goes to IDF, -1 waiting for ever. */
-	timeout_ms = bus_config->timeout_ms ? (uint32_t)bus_config->timeout_ms :
-		     BMI088_TIMEOUT_MS;
-#else
-	timeout_ms = bus_config->timeout_ms > 0 ?
-		     (uint32_t)bus_config->timeout_ms : BMI088_TIMEOUT_MS;
 #endif
+	/* One rule on both platforms, as for every imu chip on I2C. */
+	if (bus_config->timeout_ms < 0) {
+		imu_err(imu, "timeout %d ms is negative",
+			bus_config->timeout_ms);
+		return -EINVAL;
+	}
+	timeout_ms = bus_config->timeout_ms ?
+		     (uint32_t)bus_config->timeout_ms : BMI088_TIMEOUT_MS;
 
 	/*
 	 * Both dies there at all? See imu_i2c_probe() for why not the first

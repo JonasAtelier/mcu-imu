@@ -101,6 +101,8 @@ static void test_bus_configs(void)
 	allocs = 0;
 	i2c.address = 0x68;
 	assert(lis2dh12_probe_i2c(&imu, &i2c, &base) == -EINVAL);
+	i2c = (struct lis2dh12_i2c_config){ .bus = &hi2c, .timeout_ms = -1 };
+	assert(lis2dh12_probe_i2c(&imu, &i2c, &base) == -EINVAL);
 	i2c = (struct lis2dh12_i2c_config){ .bus = NULL };
 	assert(lis2dh12_probe_i2c(&imu, &i2c, &base) == -EINVAL);
 	assert(allocs == 0);

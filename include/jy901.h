@@ -42,9 +42,9 @@ struct jy901_uart_config {
 	/*
 	 * The longest wait for the stream, per read. 0 selects 200 ms: two
 	 * output periods at the module's default 10 Hz (§6.2, p.35). Raise it
-	 * if the module is set to a slower rate.
+	 * if the module is set to a slower rate. A negative value is -EINVAL.
 	 */
-	uint32_t timeout_ms;
+	int timeout_ms;
 };
 
 #ifdef ESP_PLATFORM
@@ -59,7 +59,7 @@ struct jy901_i2c_config {
 	uint8_t address;
 	/* 0 selects 400 kHz, which is also the most (chapter 7, p.46). */
 	uint32_t clock_hz;
-	/* 0 selects 100 ms. */
+	/* 0 selects 100 ms; a negative value is -EINVAL. */
 	int timeout_ms;
 };
 #elif defined(HAL_I2C_MODULE_ENABLED)
@@ -71,7 +71,7 @@ struct jy901_i2c_config {
 	I2C_HandleTypeDef *bus;
 	/* 7-bit; 0 selects 0x50 (§6.2.32, p.45). */
 	uint8_t address;
-	/* 0 selects 100 ms. */
+	/* 0 selects 100 ms; a negative value is -EINVAL. */
 	int timeout_ms;
 };
 #endif
@@ -92,8 +92,8 @@ struct jy901_i2c_config {
  * -EBADMSG if bytes arrive but no frame's SUM ever matches.
  * -ENODATA if valid frames arrive but never both 0x51 and 0x52: their
  * output is switched off in the module's return content.
- * -EINVAL for a NULL imu or handle, or on ESP-IDF a port with no driver
- * installed.
+ * -EINVAL for a NULL imu or handle, a negative timeout, or on ESP-IDF a
+ * port with no driver installed.
  */
 #if defined(ESP_PLATFORM) || defined(HAL_UART_MODULE_ENABLED)
 int jy901_probe_uart(struct imu_dev *imu,
@@ -112,7 +112,8 @@ int jy901_probe_uart(struct imu_dev *imu,
  * imu->name, ops and priv; leaves imu->mount alone.
  *
  * -EBUSY if imu is already bound. -EINVAL for a NULL imu, config or bus, an
- * address above 0x7f, or on ESP-IDF a clock above 400 kHz. -ENXIO when
+ * address above 0x7f, a negative timeout, or on ESP-IDF a clock above
+ * 400 kHz. -ENXIO when
  * nothing answers at the address, -ENODEV when IICADDR does not match, both
  * decided before anything is allocated. A bus error as the port gives it.
  */

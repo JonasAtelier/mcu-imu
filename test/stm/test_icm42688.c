@@ -163,6 +163,8 @@ static void test_bus_configs(void)
 	allocs = 0;
 	i2c.address = 0x18;
 	assert(icm42688_probe_i2c(&imu, &i2c, &base) == -EINVAL);
+	i2c = (struct icm42688_i2c_config){ .bus = &hi2c, .timeout_ms = -1 };
+	assert(icm42688_probe_i2c(&imu, &i2c, &base) == -EINVAL);
 	i2c = (struct icm42688_i2c_config){ .bus = NULL };
 	assert(icm42688_probe_i2c(&imu, &i2c, &base) == -EINVAL);
 	hspi.Init.CLKPhase = SPI_PHASE_1EDGE;		/* mode 2 */

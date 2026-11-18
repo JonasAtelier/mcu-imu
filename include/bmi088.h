@@ -117,7 +117,7 @@ struct bmi088_i2c_config {
 	uint8_t gyro_address;
 	/* 0 selects 400 kHz. */
 	uint32_t clock_hz;
-	/* 0 selects 100 ms. */
+	/* 0 selects 100 ms; a negative value is -EINVAL. */
 	int timeout_ms;
 };
 
@@ -144,7 +144,7 @@ struct bmi088_i2c_config {
 	/* 7-bit; 0 selects the 0x18 accelerometer and 0x68 gyroscope defaults. */
 	uint8_t accel_address;
 	uint8_t gyro_address;
-	/* 0 selects 100 ms. */
+	/* 0 selects 100 ms; a negative value is -EINVAL. */
 	int timeout_ms;
 };
 
@@ -173,8 +173,8 @@ struct bmi088_config bmi088_default_config(void);
  * -EBUSY if imu is already bound (see struct imu_dev); nothing is touched.
  * -ENODEV if a die answers with the wrong chip ID, -EIO if a register does
  * not read back what was written or the accelerometer flags an error, -ENXIO
- * if nothing ACKs on I2C, -EINVAL for a bad address, clock, SPI mode, CS or
- * config.
+ * if nothing ACKs on I2C, -EINVAL for a bad address, clock, timeout, SPI
+ * mode, CS or config.
  */
 int bmi088_probe_i2c(struct imu_dev *imu,
 		     const struct bmi088_i2c_config *bus_config,

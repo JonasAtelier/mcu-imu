@@ -236,7 +236,11 @@ int wt901_probe(struct imu_dev *imu,
 
 	imu->name = "wt901";
 
-	timeout_ms = cfg && cfg->timeout_ms ? cfg->timeout_ms :
+	if (cfg && cfg->timeout_ms < 0) {
+		imu_err(imu, "timeout %d ms is negative", cfg->timeout_ms);
+		return -EINVAL;
+	}
+	timeout_ms = cfg && cfg->timeout_ms ? (uint32_t)cfg->timeout_ms :
 		     DEFAULT_TIMEOUT_MS;
 	ret = imu_uart_attach(&bus, uart, timeout_ms);
 	if (ret) {

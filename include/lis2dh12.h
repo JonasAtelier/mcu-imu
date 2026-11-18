@@ -115,7 +115,7 @@ struct lis2dh12_i2c_config {
 	uint8_t address;
 	/* 0 selects 400 kHz, the most the part takes. */
 	uint32_t clock_hz;
-	/* 0 selects 100 ms. */
+	/* 0 selects 100 ms; a negative value is -EINVAL. */
 	int timeout_ms;
 };
 #else
@@ -127,7 +127,7 @@ struct lis2dh12_i2c_config {
 	I2C_HandleTypeDef *bus;
 	/* 7-bit; 0 selects 0x18. */
 	uint8_t address;
-	/* 0 selects 100 ms. */
+	/* 0 selects 100 ms; a negative value is -EINVAL. */
 	int timeout_ms;
 };
 #endif

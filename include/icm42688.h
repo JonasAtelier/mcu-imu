@@ -151,7 +151,7 @@ struct icm42688_i2c_config {
 	uint8_t address;
 	/* 0 selects 400 kHz; at most 1 MHz (9.3). */
 	uint32_t clock_hz;
-	/* 0 selects 100 ms. */
+	/* 0 selects 100 ms; a negative value is -EINVAL. */
 	int timeout_ms;
 };
 
@@ -174,7 +174,7 @@ struct icm42688_i2c_config {
 	I2C_HandleTypeDef *bus;
 	/* 7-bit; 0 selects 0x68. */
 	uint8_t address;
-	/* 0 selects 100 ms. */
+	/* 0 selects 100 ms; a negative value is -EINVAL. */
 	int timeout_ms;
 };
 
