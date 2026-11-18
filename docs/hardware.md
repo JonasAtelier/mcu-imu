@@ -9,8 +9,9 @@ Paths mentioned in this guide are relative to the repository root.
 On ESP-IDF any GPIO works; the examples in `examples/esp/` set theirs at the
 top of `main.c`. On STM32, pins are the ones the examples in `examples/stm/`
 use, on an F4: I2C1 on PB8/PB9 (AF4), SPI1 on
-PA5/PA6/PA7 (AF5), chip selects on PD14/PD15. Any pin your chip routes to the
-same peripheral works; check the alternate-function table in its datasheet.
+PA5/PA6/PA7 (AF5), chip selects on PD14/PD15, USART1 on PA9/PA10 (AF7). Any
+pin your chip routes to the same peripheral works; check the
+alternate-function table in its datasheet.
 The bus init — pins, clocks, speed, SPI mode — is the app's; each example
 shows one.
 
@@ -156,7 +157,7 @@ Names and ranges are from the BMI270 datasheet (BST-BMI270-DS000-08, rev.
 1.6): section 7.1 and Table 17 for the pins, Table 1 for the supplies, 6.3
 to 6.5 for the interfaces.
 
-### WT901C-TTL — no example
+### WT901C-TTL — `examples/*/wt901`
 
 Pin names are the WT901 core's, from §3 of `docs/WT901.pdf` (p.5); the cased
 C-TTL is assumed to bring out the same signals. Only the four serial lines
@@ -166,8 +167,12 @@ are used: this driver does not support the IIC mode or the D0–D3 ports.
 |---|---|---|
 | VCC | 3.3 V or 5 V | the module regulates it: 3.3–5 V (§1, p.4; §2 item 1) |
 | GND | GND | shared ground, always |
-| TX | the MCU's UART RX | the module's serial output, TTL level (§3) |
-| RX | the MCU's UART TX | the module's serial input, TTL level (§3) |
+| TX | the MCU's UART RX | GPIO 18 on ESP-IDF, PA10 (USART1_RX, AF7) on STM32 in the examples; the module's serial output, TTL level (§3) |
+| RX | the MCU's UART TX | GPIO 17 on ESP-IDF, PA9 (USART1_TX, AF7) on STM32 in the examples; the module's serial input, TTL level (§3) |
+
+In the STM32 example USART1 carries the sensor only, so the `printf()` log
+needs a different UART, such as the USART2 a Nucleo-64 wires to the
+ST-LINK's virtual COM port.
 
 TX and RX cross over. The link is TTL level, never RS232, at 9600 bps with
 no parity out of the box (chapter 6, p.30); this library reads "stop bit and
@@ -206,7 +211,7 @@ I2C at up to 400 kHz (chapter 7, p.46), at 7-bit address 0x50 unless it was
 changed (§6.2.32, p.45). **An EEPROM at 0x50 on the same bus collides with
 this**; the probe refuses one, but both cannot share the address.
 
-### LIS2DH12 — no example
+### LIS2DH12 — `examples/*/lis2dh12`
 
 The bare chip on a board, I2C. Pin names are the datasheet's (section 4,
 "Pin description"; UNVERIFIED, see the [chip reference](chips.md#lis2dh12)).
@@ -216,8 +221,8 @@ The bare chip on a board, I2C. Pin names are the datasheet's (section 4,
 | VDD, VDD_IO | 3.3 V | 1.71–3.6 V; 100 nF at VDD |
 | GND, RES | GND | RES is a reserved pin tied to GND |
 | CS | VDD_IO | high selects I2C; low would select SPI |
-| SCL/SPC | SCL | 4.7 k pull-up to VDD_IO |
-| SDA/SDI/SDO | SDA | 4.7 k pull-up to VDD_IO |
+| SCL/SPC | SCL | GPIO 22 on ESP-IDF, PB8 (I2C1_SCL, AF4) on STM32 in the examples; 4.7 k pull-up to VDD_IO |
+| SDA/SDI/SDO | SDA | GPIO 21 on ESP-IDF, PB9 (I2C1_SDA, AF4) on STM32 in the examples; 4.7 k pull-up to VDD_IO |
 | SDO/SA0 | GND or VDD_IO | address bit 0: 0x18 low, 0x19 high. Tied to a rail, `sa0_pullup_off` saves the internal pull-up's current |
 | INT1 | a GPIO | push-pull, no pull-up needed; polarity by `int_active_low` |
 | INT2 | nothing | not used by the driver |

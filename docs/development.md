@@ -38,8 +38,8 @@ test/                       host tests, `make -C test test`
   stm/                      suites on hal_stubs/, through imu_port_stm.c
   idf_stubs/  hal_stubs/    the slice of ESP-IDF and of the HAL the code calls
 examples/
-  esp/<chip-or-board>/      ESP-IDF projects: bmi088, bmi088_spi, bmi270, icm42688, icm45686, jy901, mpu6050
-  stm/<chip-or-board>/      STM32 snippets: bmi088, bmi088_spi, bmi270, icm42688, icm45686, jy901, mpu6050
+  esp/<chip-or-board>/      ESP-IDF projects: bmi088, bmi088_spi, bmi270, icm42688, icm45686, jy901, lis2dh12, mpu6050, wt901
+  stm/<chip-or-board>/      STM32 snippets: bmi088, bmi088_spi, bmi270, icm42688, icm45686, jy901, lis2dh12, mpu6050, wt901
 docs/                       the five guides; datasheet PDFs here are gitignored
 assets/                     README and chip-reference figures
 CMakeLists.txt              ESP-IDF component; elsewhere a static library for add_subdirectory(); stm-forge globs src/**/*.c instead

@@ -20,11 +20,11 @@ The bus column lists the interfaces the driver supports. The example links show 
 | [MPU-6050](docs/chips.md#mpu-6050) | I2C | InvenSense 6-axis IMU | [mpu6050.h](include/mpu6050.h) | [I2C](examples/esp/mpu6050/) | [I2C](examples/stm/mpu6050/main.c) |
 | [ICM-45686](docs/chips.md#icm-45686) | SPI | TDK InvenSense 6-axis IMU | [icm45686.h](include/icm45686.h) | [SPI](examples/esp/icm45686/) | [SPI](examples/stm/icm45686/main.c) |
 | [BMI088](docs/chips.md#bmi088) | I2C or SPI | Bosch 6-axis IMU on two dies | [bmi088.h](include/bmi088.h) | [I2C](examples/esp/bmi088/) · [SPI](examples/esp/bmi088_spi/) | [I2C](examples/stm/bmi088/main.c) · [SPI](examples/stm/bmi088_spi/main.c) |
-| [WT901C-TTL](docs/chips.md#wt901c-ttl) | UART | WitMotion attitude module | [wt901.h](include/wt901.h) | — | — |
+| [WT901C-TTL](docs/chips.md#wt901c-ttl) | UART | WitMotion attitude module | [wt901.h](include/wt901.h) | [UART](examples/esp/wt901/) | [UART](examples/stm/wt901/main.c) |
 | [ICM-42688-P](docs/chips.md#icm-42688-p) | I2C or SPI | TDK InvenSense 6-axis IMU | [icm42688.h](include/icm42688.h) | [SPI](examples/esp/icm42688/) | [I2C](examples/stm/icm42688/main.c) |
 | [BMI270](docs/chips.md#bmi270) | I2C or SPI | Bosch 6-axis IMU | [bmi270.h](include/bmi270.h) | [I2C](examples/esp/bmi270/) | [SPI](examples/stm/bmi270/main.c) |
 | [JY901](docs/chips.md#jy901) | UART or I2C | WitMotion attitude module | [jy901.h](include/jy901.h) | [UART](examples/esp/jy901/) | [I2C](examples/stm/jy901/main.c) |
-| [LIS2DH12](docs/chips.md#lis2dh12) | I2C | ST 3-axis accelerometer, motion interrupt | [lis2dh12.h](include/lis2dh12.h) | — | — |
+| [LIS2DH12](docs/chips.md#lis2dh12) | I2C | ST 3-axis accelerometer, motion interrupt | [lis2dh12.h](include/lis2dh12.h) | [I2C](examples/esp/lis2dh12/) | [I2C](examples/stm/lis2dh12/main.c) |
 
 A dash marks a hardware and platform combination without a dedicated example.
 
