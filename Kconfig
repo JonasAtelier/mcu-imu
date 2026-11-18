@@ -68,6 +68,15 @@ if IMU
             registers on I2C. On the STM32 HAL each probe is built with its
             own module, UART or I2C; one of them is needed.
 
+    config IMU_LIS2DH12
+        bool "ST LIS2DH12 accelerometer (I2C)"
+        default n
+        help
+            Build the LIS2DH12 driver: lis2dh12_probe_i2c() and friends,
+            with its motion detector on INT1. Accelerometer only: imu_read()
+            gives NaN for the gyroscope and the temperature. On the STM32
+            HAL it needs the I2C module.
+
     config IMU_DEBUG
         bool "imu_dbg() lines"
         default n

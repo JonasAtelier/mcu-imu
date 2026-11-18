@@ -17,7 +17,7 @@
  */
 #if !(CONFIG_IMU_MPU6050 || CONFIG_IMU_ICM45686 || CONFIG_IMU_BMI088 || \
       CONFIG_IMU_WT901 || CONFIG_IMU_BMI270 || CONFIG_IMU_ICM42688 || \
-      CONFIG_IMU_JY901)
+      CONFIG_IMU_JY901 || CONFIG_IMU_LIS2DH12)
 #warning "imu: no chip driver is selected; set IMU_<CHIP> = y under PKG_imu = y (or -DCONFIG_IMU_<CHIP>=1)"
 #endif
 
