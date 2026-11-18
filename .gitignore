@@ -31,3 +31,6 @@ test/stm/test_icm42688
 test/test_jy901_math
 test/esp/test_jy901
 test/stm/test_jy901
+test/test_lis2dh12_math
+test/esp/test_lis2dh12
+test/stm/test_lis2dh12
