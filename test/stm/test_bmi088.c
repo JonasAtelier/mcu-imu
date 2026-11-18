@@ -553,6 +553,10 @@ static void test_rejects_bad_bus_config(void)
 	i2c_bad.bus = NULL;
 	EXPECT_EQ(bmi088_probe_i2c(&imu, &i2c_bad, NULL), -EINVAL);
 
+	i2c_bad = i2c_config();
+	i2c_bad.timeout_ms = -1;
+	EXPECT_EQ(bmi088_probe_i2c(&imu, &i2c_bad, NULL), -EINVAL);
+
 	EXPECT_EQ(allocs, 0);
 	EXPECT_EQ(xfer_count, 0);
 

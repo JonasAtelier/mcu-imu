@@ -41,9 +41,9 @@ struct wt901_config {
 	/*
 	 * The longest wait for the stream, per read. 0 selects 200 ms: two
 	 * output periods at the module's default 10 Hz (§6.2, p.35). Raise it
-	 * if the module is set to a slower rate.
+	 * if the module is set to a slower rate. A negative value is -EINVAL.
 	 */
-	uint32_t timeout_ms;
+	int timeout_ms;
 };
 
 /*
@@ -63,8 +63,8 @@ struct wt901_config {
  * -EBADMSG if bytes arrive but no frame's SUM ever matches.
  * -ENODATA if valid frames arrive but never both 0x51 and 0x52: their
  * output is switched off in the module's return content.
- * -EINVAL for a NULL imu or handle, or on ESP-IDF a port with no driver
- * installed.
+ * -EINVAL for a NULL imu or handle, a negative timeout, or on ESP-IDF a
+ * port with no driver installed.
  */
 int wt901_probe(struct imu_dev *imu,
 #ifdef ESP_PLATFORM

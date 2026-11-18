@@ -8,7 +8,9 @@
  *     device it talks to -- the BMI088 one per die -- and reaches it only
  *     through bus->ops->transfer(), so one driver can sit on I2C or SPI,
  *     and a command/response part on a UART. Every category library offers
- *     all three kinds, used or not; no imu chip uses the UART yet.
+ *     all three kinds, used or not; here the WT901 and the JY901 use the
+ *     UART, reading their module's frame stream with imu_bus_receive() and
+ *     sending its commands through transfer().
  *   - The platform is chosen at link time. imu_port_esp.c and
  *     imu_port_stm.c each define the ops tables, the attach functions, the
  *     clock and the waits below for their platform; the other one compiles

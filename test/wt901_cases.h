@@ -187,6 +187,16 @@ static void test_probe(void)
 	assert(allocs == 0);
 
 	assert(wt901_probe(NULL, TEST_UART, NULL) == -EINVAL);
+
+	/* A negative timeout: refused with a good stream on the line. */
+	{
+		const struct wt901_config negative = { .timeout_ms = -1 };
+
+		line_reset();
+		put_cycle(0, 0, 0, 2500);
+		assert(wt901_probe(&imu, TEST_UART, &negative) == -EINVAL);
+		assert(allocs == 0 && !imu.ops);
+	}
 }
 
 static void test_scales(void)

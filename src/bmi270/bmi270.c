@@ -565,7 +565,12 @@ int bmi270_probe_i2c(struct imu_dev *imu,
 	}
 	scl_hz = bus_config->clock_hz ? bus_config->clock_hz : BMI270_I2C_HZ;
 #endif
-	timeout_ms = bus_config->timeout_ms > 0 ?
+	if (bus_config->timeout_ms < 0) {
+		imu_err(imu, "timeout %d ms is negative",
+			bus_config->timeout_ms);
+		return -EINVAL;
+	}
+	timeout_ms = bus_config->timeout_ms ?
 		     (uint32_t)bus_config->timeout_ms : BMI270_TIMEOUT_MS;
 
 	/* There at all? See imu_i2c_probe(); decided before allocating. */

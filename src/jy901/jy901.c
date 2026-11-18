@@ -306,8 +306,12 @@ int jy901_probe_uart(struct imu_dev *imu,
 
 	imu->name = "jy901";
 
-	timeout_ms = config && config->timeout_ms ? config->timeout_ms :
-		     UART_TIMEOUT_MS;
+	if (config && config->timeout_ms < 0) {
+		imu_err(imu, "timeout %d ms is negative", config->timeout_ms);
+		return -EINVAL;
+	}
+	timeout_ms = config && config->timeout_ms ?
+		     (uint32_t)config->timeout_ms : UART_TIMEOUT_MS;
 	ret = imu_uart_attach(&bus, uart, timeout_ms);
 	if (ret) {
 		imu_err(imu, "cannot use the UART (%d)", ret);
@@ -382,7 +386,12 @@ int jy901_probe_i2c(struct imu_dev *imu,
 	scl_hz = bus_config->clock_hz ? bus_config->clock_hz :
 		 JY901_I2C_MAX_HZ;
 #endif
-	timeout_ms = bus_config->timeout_ms > 0 ?
+	if (bus_config->timeout_ms < 0) {
+		imu_err(imu, "timeout %d ms is negative",
+			bus_config->timeout_ms);
+		return -EINVAL;
+	}
+	timeout_ms = bus_config->timeout_ms ?
 		     (uint32_t)bus_config->timeout_ms : I2C_TIMEOUT_MS;
 
 	/* There at all? See imu_i2c_probe(); decided before allocating. */

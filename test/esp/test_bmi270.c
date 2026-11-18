@@ -205,6 +205,8 @@ static void test_bus_configs(void)
 	assert(bmi270_probe_i2c(&imu, &i2c, NULL) == -EINVAL);
 	i2c = (struct bmi270_i2c_config){ .bus = I2C_BUS, .clock_hz = 1000001 };
 	assert(bmi270_probe_i2c(&imu, &i2c, NULL) == -EINVAL);
+	i2c = (struct bmi270_i2c_config){ .bus = I2C_BUS, .timeout_ms = -1 };
+	assert(bmi270_probe_i2c(&imu, &i2c, NULL) == -EINVAL);
 	i2c = (struct bmi270_i2c_config){ .bus = NULL };
 	assert(bmi270_probe_i2c(&imu, &i2c, NULL) == -EINVAL);
 	assert(bmi270_probe_i2c(&imu, NULL, NULL) == -EINVAL);

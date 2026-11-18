@@ -249,6 +249,16 @@ static void test_uart_probe(void)
 	assert(allocs == 0);
 
 	assert(jy901_probe_uart(NULL, TEST_UART, NULL) == -EINVAL);
+
+	/* A negative timeout: refused with a good stream on the line. */
+	{
+		const struct jy901_uart_config negative = { .timeout_ms = -1 };
+
+		line_reset();
+		put_cycle(0, 0, 0, 2500);
+		assert(jy901_probe_uart(&imu, TEST_UART, &negative) == -EINVAL);
+		assert(allocs == 0 && !imu.ops);
+	}
 }
 
 static void test_uart_read(void)
@@ -434,6 +444,9 @@ static void test_i2c_probe(void)
 	/* Refused before any traffic. */
 	chip_reset();
 	config = i2c_config(0x80);
+	assert(jy901_probe_i2c(&imu, &config) == -EINVAL);
+	config = i2c_config(0);
+	config.timeout_ms = -1;
 	assert(jy901_probe_i2c(&imu, &config) == -EINVAL);
 	assert(jy901_probe_i2c(&imu, NULL) == -EINVAL);
 	assert(jy901_probe_i2c(NULL, &config) == -EINVAL);
