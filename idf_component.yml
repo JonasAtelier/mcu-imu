@@ -1,7 +1,7 @@
 version: "1.0.0"
 description: mcu-imu IMU subsystem for ESP-IDF and STM32 HAL, with MPU-6050, ICM-45686, BMI088, WT901C-TTL, ICM-42688-P, BMI270, JY901 and LIS2DH12 drivers.
 url: https://github.com/JonasAtelier/mcu-imu
-license: MIT
+license: GPL-3.0-only
 dependencies:
   idf:
     version: ">=5.2"
