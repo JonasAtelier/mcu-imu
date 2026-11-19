@@ -102,7 +102,7 @@ To run the simulated tests on your computer, run `make -C test test` from the li
 
 ## License
 
-[MIT](LICENSE). The BMI270 driver carries Bosch Sensortec's configuration
+© 2026 JonasAtelier, [GPL-3.0-only](LICENSE). The BMI270 driver carries Bosch Sensortec's configuration
 file for the chip under the BSD 3-Clause licence; [NOTICE](NOTICE) has its
 origin and Bosch's notice, which a firmware built with `IMU_BMI270` must ship
 with.

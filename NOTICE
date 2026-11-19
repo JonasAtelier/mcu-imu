@@ -1,5 +1,5 @@
 mcu-imu
-Copyright (c) 2026 JonasAtelier. MIT licence, see LICENSE.
+Copyright (c) 2026 JonasAtelier. GPL-3.0-only, see LICENSE.
 
 This repository and the firmware built from it with IMU_BMI270 enabled
 contain third-party code:
